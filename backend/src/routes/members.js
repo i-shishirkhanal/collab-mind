@@ -1,0 +1,49 @@
+const express = require('express');
+const memberController       = require('../controllers/memberController');
+const authenticate           = require('../middleware/authenticate');
+const requireWorkspaceMember = require('../middleware/requireWorkspaceMember');
+const requireRole            = require('../middleware/requireRole');
+
+// mergeParams lets us access :workspaceId defined in the parent router (index.js)
+const router = express.Router({ mergeParams: true });
+
+/**
+ * GET /workspaces/:workspaceId/members
+ * List all members. Any workspace member may view the list.
+ * Middleware: authenticate → requireWorkspaceMember
+ */
+router.get(
+  '/:workspaceId/members',
+  authenticate,
+  requireWorkspaceMember,
+  memberController.listMembers,
+);
+
+/**
+ * POST /workspaces/:workspaceId/members
+ * Invite a user by email. Only owners may add members.
+ * Body: { email, role? }
+ * Middleware: authenticate → requireWorkspaceMember → requireRole('owner')
+ */
+router.post(
+  '/:workspaceId/members',
+  authenticate,
+  requireWorkspaceMember,
+  requireRole('owner'),
+  memberController.addMember,
+);
+
+/**
+ * DELETE /workspaces/:workspaceId/members/:userId
+ * Remove a member by their user id. Only owners may remove members.
+ * Middleware: authenticate → requireWorkspaceMember → requireRole('owner')
+ */
+router.delete(
+  '/:workspaceId/members/:userId',
+  authenticate,
+  requireWorkspaceMember,
+  requireRole('owner'),
+  memberController.removeMember,
+);
+
+module.exports = router;

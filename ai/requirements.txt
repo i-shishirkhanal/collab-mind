@@ -1,0 +1,26 @@
+# Python dependencies for the CollabMind AI service
+# Install everything with:  pip install -r requirements.txt
+
+# ── Web framework ──────────────────────────────────────────────────────────────
+fastapi>=0.110.0            # The web framework
+uvicorn[standard]>=0.29.0   # ASGI server that runs FastAPI (like Node's Express server)
+
+# ── Database ───────────────────────────────────────────────────────────────────
+asyncpg>=0.29.0             # Async PostgreSQL driver — much faster than psycopg2 for async code
+
+# ── Google AI ─────────────────────────────────────────────────────────────────
+google-generativeai>=0.5.0  # Official Google Generative AI SDK (Gemini)
+google-cloud-storage>=2.16.0 # GCS client for downloading source files
+
+# ── Tokenization & PDF Parsing ──────────────────────────────────────────────────
+tiktoken>=0.7.0             # Fast BPE tokenizer — used to count tokens for chunking
+pypdf>=4.0.0                # PDF parser for extracting text from uploaded PDFs
+
+# ── LangGraph / LangChain (agent framework) ────────────────────────────────────
+langgraph>=0.1.0                       # Graph-based agent runtime
+langchain>=0.2.0                       # Core LangChain abstractions
+langchain-google-genai>=1.0.0          # LangChain ↔ Gemini integration
+
+# ── Utilities ──────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0        # Loads .env file into os.environ automatically
+redis[asyncio]>=5.0.0       # Async pub/sub and KV store for agent statuses

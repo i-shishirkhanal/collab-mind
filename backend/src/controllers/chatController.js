@@ -1,0 +1,58 @@
+const chatService = require('../services/chatService');
+
+/**
+ * getMessages — GET /workspaces/:workspaceId/chat/messages
+ * Returns paginated chat history for a workspace.
+ *
+ * Query params:
+ *   ?limit=50      - number of messages (default 50, max 100)
+ *   ?before=<ISO>  - cursor: return messages older than this timestamp
+ */
+const getMessages = async (req, res, next) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const before = req.query.before || null;
+
+    const messages = await chatService.getChatMessages(
+      req.params.workspaceId,
+      limit,
+      before,
+    );
+
+    res.json({ messages, count: messages.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * sendMessage — POST /workspaces/:workspaceId/chat
+ * Persists the user message and proxies it to the AI service.
+ *
+ * Request body: { message: string }
+ * Response:     { userMessage: Object, aiMessage: Object }
+ */
+const sendMessage = async (req, res, next) => {
+  try {
+    const { message, conversation_history } = req.body;
+
+    if (!message || typeof message !== 'string' || message.trim() === '') {
+      return res.status(400).json({ error: 'message is required and must be a non-empty string' });
+    }
+
+    const result = await chatService.sendChatMessage(
+      req.params.workspaceId,
+      req.user.id,
+      message.trim(),
+      conversation_history || []
+    );
+
+    res.status(201).json(result);
+  } catch (err) {
+    // Surface 502 from AI service failures directly
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+};
+
+module.exports = { getMessages, sendMessage };

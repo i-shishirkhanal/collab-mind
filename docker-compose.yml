@@ -1,0 +1,106 @@
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: collabmind-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: collabmind
+      POSTGRES_PASSWORD: collabmind_password
+      POSTGRES_DB: collabmind
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migration.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collabmind -d collabmind"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: collabmind-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    container_name: collabmind-ai
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://collabmind:collabmind_password@db:5432/collabmind
+      - REDIS_URL=redis://redis:6379
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-dummy_gemini_key_for_testing}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: collabmind-backend
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - DATABASE_URL=postgresql://collabmind:collabmind_password@db:5432/collabmind
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai:8000
+      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_123}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-your_google_client_id.apps.googleusercontent.com}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health | grep ok || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: collabmind-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:4000
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-super_secret_nextauth_key_123}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads_data:
