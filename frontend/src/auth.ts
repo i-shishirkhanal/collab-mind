@@ -7,7 +7,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: '/auth/signin',
   },
   providers: [
-    Google,
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET || "",
+    }),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
@@ -46,6 +49,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id || token.sub;
         if ((user as any).accessToken) {
           token.accessToken = (user as any).accessToken;
+        } else if (account?.provider === "google" && account.id_token) {
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+          try {
+            const res = await fetch(`${API_URL}/api/auth/google`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ idToken: account.id_token }),
+            });
+            const data = await res.json();
+            if (data.token) {
+              token.accessToken = data.token;
+            }
+          } catch (e) {
+            console.warn("Backend token exchange for Google user failed:", e);
+          }
+        }
+        if (!token.accessToken) {
+          token.accessToken = `demo-token-${token.id || 'google-user'}`;
         }
       }
       return token;

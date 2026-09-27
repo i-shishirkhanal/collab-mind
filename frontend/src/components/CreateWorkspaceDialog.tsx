@@ -21,7 +21,7 @@ export function CreateWorkspaceDialog() {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const workspace = await createWorkspace(name, description);
+      const workspace = await createWorkspace({ name, description });
       setOpen(false);
       router.push(`/workspace/${workspace.id}`);
     } catch (error) {

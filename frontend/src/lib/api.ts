@@ -10,27 +10,48 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (err: any) {
+    throw new Error('CONNECTION_FAILED');
+  }
 
-  if (!response.ok) {
-    let errorJson: any = {};
-    try { errorJson = await response.json(); } catch (e) {}
-    throw new Error(errorJson.error || errorJson.detail || `API error: ${response.status} ${response.statusText}`);
+  if (response.status === 401) {
+    throw new Error('UNAUTHORIZED');
   }
 
   const text = await response.text();
-  return text ? JSON.parse(text) : {};
+  let parsed: any = null;
+  if (text && text.trim()) {
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      parsed = text;
+    }
+  }
+
+  if (!response.ok) {
+    const errorMsg = (typeof parsed === 'object' && parsed !== null)
+      ? (parsed.error || parsed.detail || parsed.message || `API error: ${response.status} ${response.statusText}`)
+      : (typeof parsed === 'string' && parsed ? parsed : `API error: ${response.status} ${response.statusText}`);
+    throw new Error(errorMsg);
+  }
+
+  return parsed ?? {};
 }
 
 // Workspace API
 export const getWorkspaces = () => apiCall('/api/workspaces');
 export const getWorkspaceById = (id: string) => apiCall(`/api/workspaces/${id}`);
 export const getWorkspace = getWorkspaceById;
-export const createWorkspace = (data: { name: string; description?: string }) => 
-  apiCall('/api/workspaces', { method: 'POST', body: JSON.stringify(data) });
+export const createWorkspace = (data: { name: string; description?: string } | string, description?: string) => {
+  const body = typeof data === 'string' ? { name: data, description } : data;
+  return apiCall('/api/workspaces', { method: 'POST', body: JSON.stringify(body) });
+};
 
 // Sources API
 export const getSources = (workspaceId: string, type?: string) => 
@@ -41,21 +62,41 @@ export const uploadSourceFile = async (workspaceId: string, file: File) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_URL}/api/workspaces/${workspaceId}/sources/upload`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    let errorJson: any = {};
-    try { errorJson = await response.json(); } catch (e) {}
-    throw new Error(errorJson.error || errorJson.detail || 'Failed to upload source file');
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/workspaces/${workspaceId}/sources/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData,
+    });
+  } catch (err: any) {
+    throw new Error('CONNECTION_FAILED');
   }
 
-  return response.json();
+  if (response.status === 401) {
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const text = await response.text();
+  let parsed: any = null;
+  if (text && text.trim()) {
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      parsed = text;
+    }
+  }
+
+  if (!response.ok) {
+    const errorMsg = (typeof parsed === 'object' && parsed !== null)
+      ? (parsed.error || parsed.detail || parsed.message || 'Failed to upload source file')
+      : (typeof parsed === 'string' && parsed ? parsed : 'Failed to upload source file');
+    throw new Error(errorMsg);
+  }
+
+  return parsed ?? {};
 };
 
 export const uploadFile = uploadSourceFile;

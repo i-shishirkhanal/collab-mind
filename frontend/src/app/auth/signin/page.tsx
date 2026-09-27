@@ -76,7 +76,12 @@ export default function SignIn() {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      if (supabaseUrl && supabaseKey && !supabaseUrl.includes("127.0.0.1:54421")) {
+      if (
+        supabaseUrl &&
+        supabaseKey &&
+        !supabaseUrl.includes("127.0.0.1:54421") &&
+        !supabaseUrl.includes("your-project-id")
+      ) {
         // Supabase Google OAuth integration
         const { createClient } = await import("@/lib/supabase/client");
         const supabase = createClient();
@@ -92,7 +97,24 @@ export default function SignIn() {
           setGoogleLoading(false);
         }
       } else {
-        // NextAuth Google Sign-In fallback
+        const googleId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+        if (!googleId || googleId.includes("your_google_client_id")) {
+          // Demo fallback for local development when Google OAuth client ID is not configured
+          const res = await signIn("credentials", {
+            email: "google.user@collabmind.ai",
+            name: "Google Researcher",
+            redirect: false,
+          });
+          if (res?.ok) {
+            router.push("/dashboard");
+            router.refresh();
+          } else {
+            setError("Google sign-in failed to initialize.");
+            setGoogleLoading(false);
+          }
+          return;
+        }
+        // NextAuth Google Sign-In
         await signIn("google", { callbackUrl: "/dashboard" });
       }
     } catch (err: any) {

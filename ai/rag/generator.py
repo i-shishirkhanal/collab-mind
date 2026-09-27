@@ -41,6 +41,27 @@ def _get_gemini_client() -> genai.GenerativeModel:
     )
 
 
+def _parse_json_from_llm(text: str) -> dict:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        cleaned = "\n".join(lines).strip()
+    
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        start_brace = cleaned.find("{")
+        end_brace = cleaned.rfind("}")
+        if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+            return json.loads(cleaned[start_brace:end_brace+1])
+        raise
+
+
+
 async def summarize_source(pool: asyncpg.Pool, request: SummarizeRequest) -> SummarizeResponse:
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -69,7 +90,7 @@ async def summarize_source(pool: asyncpg.Pool, request: SummarizeRequest) -> Sum
             )
             model = _get_gemini_client()
             response = await asyncio.to_thread(model.generate_content, prompt)
-            data = json.loads(response.text)
+            data = _parse_json_from_llm(response.text)
             return SummarizeResponse(
                 source_id=request.source_id,
                 source_name=source_name,
@@ -117,7 +138,7 @@ async def generate_flashcards(pool: asyncpg.Pool, request: FlashcardRequest) -> 
             )
             model = _get_gemini_client()
             response = await asyncio.to_thread(model.generate_content, prompt)
-            data = json.loads(response.text)
+            data = _parse_json_from_llm(response.text)
             return FlashcardsResponse(**data)
         except Exception as exc:
             print(f"[Generator] Gemini API error ({exc}). Using document extraction for flashcards.")
@@ -163,7 +184,7 @@ async def generate_quiz(pool: asyncpg.Pool, request: QuizRequest) -> QuizRespons
             )
             model = _get_gemini_client()
             response = await asyncio.to_thread(model.generate_content, prompt)
-            data = json.loads(response.text)
+            data = _parse_json_from_llm(response.text)
             return QuizResponse(**data)
         except Exception as exc:
             print(f"[Generator] Gemini API error ({exc}). Using document extraction for quiz.")
@@ -221,7 +242,7 @@ async def generate_study_guide(pool: asyncpg.Pool, request: StudyGuideRequest) -
             )
             model = _get_gemini_client()
             response = await asyncio.to_thread(model.generate_content, prompt)
-            data = json.loads(response.text)
+            data = _parse_json_from_llm(response.text)
             return StudyGuideResponse(**data)
         except Exception as exc:
             print(f"[Generator] Gemini API error ({exc}). Using document extraction for study guide.")

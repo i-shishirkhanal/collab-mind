@@ -3,10 +3,11 @@
 import { use, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, FileText, MonitorPlay, Users, Loader2 } from "lucide-react";
+import { MessageSquare, FileText, MonitorPlay, Users, Loader2, ArrowLeft } from "lucide-react";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useSocket } from "@/hooks/useSocket";
 import { usePresenceStore } from "@/lib/store";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export default function WorkspaceLayout({
   children,
@@ -44,11 +45,20 @@ export default function WorkspaceLayout({
       {/* Sidebar - 240px */}
       <aside className="w-[240px] bg-slate-900 border-r border-slate-800/60 hidden md:flex flex-col shrink-0">
         {/* Logo / Header */}
-         <div className="h-16 flex items-center px-4 border-b border-slate-800/60 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mr-3">
-            <span className="text-indigo-400 font-bold text-sm">CM</span>
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/60 shrink-0">
+          <div className="flex items-center min-w-0 mr-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mr-3 shrink-0">
+              <span className="text-indigo-400 font-bold text-sm">CM</span>
+            </div>
+            <span className="font-semibold text-slate-200 truncate">{workspace.name}</span>
           </div>
-          <span className="font-semibold text-slate-200 truncate">{workspace.name}</span>
+          <Link
+            href="/dashboard"
+            className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700/80 transition-colors shrink-0 flex items-center gap-1"
+            title="Back to Workspaces"
+          >
+            <ArrowLeft className="w-3 h-3" />
+          </Link>
         </div>
         
         {/* Nav Links */}
@@ -72,29 +82,35 @@ export default function WorkspaceLayout({
           })}
         </nav>
 
-        {/* Member Avatars */}
-        <div className="p-4 border-t border-slate-800/60">
-          <div className="text-xs font-medium text-slate-500 mb-3 px-1 uppercase tracking-wider">Team Activity</div>
-          <div className="flex flex-wrap gap-2 px-1">
-            {members.slice(0, 8).map(member => {
-              const initials = member.name.substring(0,2).toUpperCase();
-              const isOnline = onlineMembers.includes(member.user_id);
-              return (
-                <div key={member.id} className="relative group cursor-pointer" title={member.name}>
-                  <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shadow-sm">
-                    {initials}
+        {/* Member Avatars & Logout */}
+        <div className="p-4 border-t border-slate-800/60 space-y-4">
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-3 px-1 uppercase tracking-wider">Team Activity</div>
+            <div className="flex flex-wrap gap-2 px-1">
+              {members.slice(0, 8).map(member => {
+                const initials = member.name.substring(0,2).toUpperCase();
+                const isOnline = onlineMembers.includes(member.user_id);
+                return (
+                  <div key={member.id} className="relative group cursor-pointer" title={member.name}>
+                    <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shadow-sm">
+                      {initials}
+                    </div>
+                    {isOnline && (
+                      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-900 rounded-full"></div>
+                    )}
                   </div>
-                  {isOnline && (
-                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-900 rounded-full"></div>
-                  )}
+                );
+              })}
+              {members.length > 8 && (
+                 <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-700 border-dashed flex items-center justify-center text-xs font-bold text-slate-500">
+                  +{members.length - 8}
                 </div>
-              );
-            })}
-            {members.length > 8 && (
-               <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-700 border-dashed flex items-center justify-center text-xs font-bold text-slate-500">
-                +{members.length - 8}
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-800/40">
+            <LogoutButton className="w-full justify-start text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 px-3 py-2 rounded-lg transition-colors gap-2" />
           </div>
         </div>
       </aside>
@@ -102,11 +118,19 @@ export default function WorkspaceLayout({
       {/* Main Area */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Responsive Mobile Header */}
-        <header className="h-16 md:hidden flex items-center px-4 border-b border-slate-800/60 bg-slate-900">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center mr-3">
-             <span className="text-indigo-400 font-bold text-sm">CM</span>
+        <header className="h-16 md:hidden flex items-center justify-between px-4 border-b border-slate-800/60 bg-slate-900">
+          <div className="flex items-center min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center mr-3 shrink-0">
+               <span className="text-indigo-400 font-bold text-sm">CM</span>
+            </div>
+            <span className="font-semibold text-slate-200 truncate">{workspace.name}</span>
           </div>
-          <span className="font-semibold text-slate-200 truncate">{workspace.name}</span>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard" className="text-xs text-slate-400 hover:text-slate-200 px-2.5 py-1.5 rounded bg-slate-800 border border-slate-700">
+              Dashboard
+            </Link>
+            <LogoutButton size="sm" showText={false} variant="outline" className="border-slate-800 text-slate-400 hover:text-red-400" />
+          </div>
         </header>
 
         {error && (

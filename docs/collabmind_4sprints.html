@@ -1,0 +1,357 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--color-text-primary)}
+.wrap{padding:16px 0}
+h2{font-size:18px;font-weight:500;margin-bottom:3px}
+.sub{font-size:13px;color:var(--color-text-secondary);margin-bottom:16px}
+
+/* Sprint tabs */
+.stabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.stab{padding:6px 16px;border-radius:22px;font-size:13px;cursor:pointer;border:1px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);transition:all .15s;font-weight:400}
+.stab.active{background:var(--color-text-primary);color:var(--color-background-primary);border-color:transparent;font-weight:500}
+
+/* Sprint header card */
+.sprint-card{border:1px solid var(--color-border-tertiary);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.sprint-title{font-size:15px;font-weight:500;margin-bottom:2px}
+.sprint-goal{font-size:13px;color:var(--color-text-secondary);margin-bottom:10px}
+.sprint-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.badge{font-size:12px;padding:2px 10px;border-radius:20px;font-weight:500}
+.b-blue{background:var(--color-background-info);color:var(--color-text-info)}
+.b-green{background:var(--color-background-success);color:var(--color-text-success)}
+.b-warn{background:var(--color-background-warning);color:var(--color-text-warning)}
+.b-gray{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.prog-wrap{height:6px;border-radius:3px;background:var(--color-border-tertiary);overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;transition:width .35s}
+
+/* Deliverables */
+.deliv-list{margin-bottom:16px}
+.deliv-title{font-size:12px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.deliv{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-secondary);margin-bottom:4px}
+.deliv-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* Member lanes */
+.lanes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.lanes{grid-template-columns:1fr}}
+.lane{border:1px solid var(--color-border-tertiary);border-radius:10px;overflow:hidden}
+.lane-head{padding:9px 13px;display:flex;align-items:center;gap:8px}
+.lane-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0}
+.lane-name{font-size:13px;font-weight:500}
+.lane-role{font-size:11px;color:var(--color-text-secondary)}
+.lane-tasks{padding:6px 0}
+.task{display:flex;align-items:flex-start;gap:9px;padding:6px 12px;cursor:pointer;transition:background .12s;border-top:1px solid var(--color-border-tertiary)}
+.task:hover{background:var(--color-background-secondary)}
+.chk{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--color-border-secondary);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.chk.done{background:var(--color-text-success);border-color:var(--color-text-success)}
+.chk.done svg{display:block}
+.chk svg{display:none;width:9px;height:9px}
+.task-txt{font-size:12.5px;line-height:1.45}
+.task.done .task-txt{text-decoration:line-through;color:var(--color-text-tertiary)}
+.lane-foot{padding:5px 12px 8px;font-size:11px;color:var(--color-text-tertiary)}
+
+/* Colors per member */
+.l0 .lane-head{background:#EEEDFE} .l0 .lane-avatar{background:#7F77DD;color:#fff}
+.l1 .lane-head{background:#E1F5EE} .l1 .lane-avatar{background:#1D9E75;color:#fff}
+.l2 .lane-head{background:#FAEEDA} .l2 .lane-avatar{background:#BA7517;color:#fff}
+.l3 .lane-head{background:#FAECE7} .l3 .lane-avatar{background:#D85A30;color:#fff}
+@media(prefers-color-scheme:dark){
+.l0 .lane-head{background:#26215C} .l1 .lane-head{background:#04342C}
+.l2 .lane-head{background:#412402} .l3 .lane-head{background:#4A1B0C}
+}
+.pc0{background:#7F77DD} .pc1{background:#1D9E75} .pc2{background:#BA7517} .pc3{background:#D85A30}
+
+.review-box{border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 14px;margin-top:14px}
+.review-title{font-size:12px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.review-item{font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;display:flex;gap:8px;align-items:baseline}
+.review-item span{color:var(--color-text-primary);font-weight:500}
+
+.top-prog{margin-bottom:16px}
+.top-prog-label{font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;display:flex;justify-content:space-between}
+.top-prog-bar{height:8px;border-radius:4px;background:var(--color-border-tertiary);overflow:hidden}
+.top-prog-fill{height:100%;border-radius:4px;background:var(--color-text-success);transition:width .4s}
+</style>
+
+<div class="wrap">
+  <h2>CollabMind AI — Sprint Plan</h2>
+  <p class="sub">4 sprints · 5 days each · Review at end of every sprint</p>
+
+  <div class="top-prog">
+    <div class="top-prog-label"><span>Overall project progress</span><span id="overall-pct">0%</span></div>
+    <div class="top-prog-bar"><div class="top-prog-fill" id="overall-prog" style="width:0%"></div></div>
+  </div>
+
+  <div class="stabs" id="stabs"></div>
+  <div id="sprint-view"></div>
+</div>
+
+<script>
+const MEMBERS = [
+  {id:0,init:'M1',name:'Member 1',role:'Frontend'},
+  {id:1,init:'M2',name:'Member 2',role:'Backend + Real-time'},
+  {id:2,init:'M3',name:'Member 3',role:'AI / RAG / Agents'},
+  {id:3,init:'M4',name:'Member 4',role:'DevOps + DB + Security'},
+];
+
+const SPRINTS = [
+  {
+    n:1, label:'Sprint 1', days:'Days 1–5',
+    goal:'Project foundation — auth, workspaces, real-time chat, and the core RAG pipeline running end-to-end',
+    deliverables:[
+      'Working Google OAuth login and JWT sessions',
+      'Workspace creation with multi-owner RBAC (Owner/Editor/Viewer)',
+      'Real-time private chat between workspace members (Socket.io)',
+      'File upload (PDF, DOCX, TXT) → chunk → embed → pgvector pipeline',
+      'Basic source-grounded Gemini Q&A with inline citations',
+    ],
+    tasks:[
+      {m:0,t:'Next.js + Tailwind + shadcn/ui setup; route skeleton and landing page'},
+      {m:0,t:'Login/signup UI with Google OAuth; workspace creation and dashboard layout'},
+      {m:0,t:'Member invite UI, role picker, shared AI chat interface (message bubbles)'},
+      {m:0,t:'Inline citation rendering component (source, page, chunk ref)'},
+      {m:0,t:'Connect all UI to backend APIs; full login-to-workspace flow tested'},
+      {m:1,t:'Node.js repo setup, CI/CD pipeline, PostgreSQL schema (users, workspaces, members)'},
+      {m:1,t:'Google OAuth + NextAuth + JWT session handling; workspace CRUD APIs'},
+      {m:1,t:'RBAC middleware (Owner/Editor/Viewer guards); Socket.io workspace-scoped rooms'},
+      {m:1,t:'Redis integration (session store + Socket.io adapter); real-time chat working'},
+      {m:1,t:'File upload endpoint → Google Cloud Storage; metadata stored per workspace'},
+      {m:2,t:'FastAPI project setup (Python); Gemini Pro + Flash API connected and tested'},
+      {m:2,t:'Document chunker (512-token chunks, 50-token overlap) for PDF/DOCX/TXT'},
+      {m:2,t:'Gemini text-embedding-004 pipeline; pgvector configured with per-workspace namespaces'},
+      {m:2,t:'Hybrid retrieval (dense vector + BM25 keyword); RAG pipeline wired to Gemini Pro'},
+      {m:2,t:'Source-grounded chat endpoint: retrieve → Gemini → response with inline citations'},
+      {m:3,t:'PostgreSQL provisioned with Row-Level Security policies per workspace'},
+      {m:3,t:'Supabase Auth setup; Google Cloud Storage bucket + upload policies configured'},
+      {m:3,t:'Casbin RBAC rules; Vercel (frontend) + Cloud Run (backend) dev environments live'},
+      {m:3,t:'Redis instance up; Cloud Logging + secrets manager configured'},
+      {m:3,t:'pgvector namespace isolation tests; cross-workspace query prevention verified'},
+    ],
+    review:[
+      {q:'Can a user log in, create a workspace, and invite members?'},
+      {q:'Can members upload a document and get a cited AI answer from it?'},
+      {q:'Is real-time chat isolated to the correct workspace only?'},
+      {q:'Are cross-workspace data leaks blocked at DB and vector store level?'},
+    ]
+  },
+  {
+    n:2, label:'Sprint 2', days:'Days 6–10',
+    goal:'Expand source ingestion, harden the AI layer with trust signals, and add governance controls',
+    deliverables:[
+      'Web URL + YouTube + Google Drive ingestion working',
+      'Contradiction detection and confidence scoring per AI response',
+      'Audit log of all member and AI activity',
+      'Token budget and workspace cost quota enforcement',
+      'Y.js concurrent document editing with version history',
+    ],
+    tasks:[
+      {m:0,t:'Source library UI (upload cards, delete, source type icons, status indicators)'},
+      {m:0,t:'Audit log UI — activity feed, per-user contribution view'},
+      {m:0,t:'Token budget UI; workspace settings page (owners panel, member management)'},
+      {m:0,t:'Version history UI; Y.js collaborative editor integrated into workspace'},
+      {m:0,t:'Confidence and source quality badges on AI chat responses'},
+      {m:1,t:'Web page URL ingestion endpoint (scraper + HTML parser → chunk → embed)'},
+      {m:1,t:'YouTube transcript ingestion (YouTube API + Whisper fallback → embed)'},
+      {m:1,t:'Google Drive OAuth integration + Drive import pipeline'},
+      {m:1,t:'Y.js CRDT integration; version history and contribution tracking APIs'},
+      {m:1,t:'Source library API (list, delete, metadata) per workspace'},
+      {m:2,t:'Contradiction detection: Gemini cross-document conflict flagging'},
+      {m:2,t:'Confidence scoring: Gemini certainty level per claim based on source coverage'},
+      {m:2,t:'Source quality scoring (peer-reviewed vs blog vs social media classification)'},
+      {m:2,t:'arXiv / DOI academic paper lookup + full text extraction pipeline'},
+      {m:2,t:'Manual notes ingestion; follow-up context memory within workspace session'},
+      {m:3,t:'Audit log table schema; log writer middleware for all API and AI calls'},
+      {m:3,t:'Gemini token budget tracking; workspace-level cost quota enforcement'},
+      {m:3,t:'PII detection hook before embedding; alert system for sensitive data'},
+      {m:3,t:'Virus scan hook on all file uploads; GCS access policy hardening'},
+      {m:3,t:'Staging environment live (Vercel preview + Cloud Run staging)'},
+    ],
+    review:[
+      {q:'Can sources be ingested from web URLs, YouTube, and Google Drive?'},
+      {q:'Does the AI flag contradictions and show confidence levels?'},
+      {q:'Is every member and AI action recorded in the audit log?'},
+      {q:'Are token budgets enforced and cost quotas blocking overspend?'},
+    ]
+  },
+  {
+    n:3, label:'Sprint 3', days:'Days 11–15',
+    goal:'Build the full Studio content-generation suite — all learning, visualization, and presentation tools',
+    deliverables:[
+      'Flashcards, quizzes, study guides, oral exam simulator',
+      'Reports, executive briefs, slide decks (PPTX export)',
+      'Mind maps, knowledge graphs, data tables, timelines',
+      'Audio Overview (podcast-style) from workspace sources',
+      'Full Studio QA pass and security audit of all ingestion paths',
+    ],
+    tasks:[
+      {m:0,t:'Studio module UI shell (tabs: Learn, Visualize, Present, Media)'},
+      {m:0,t:'Flashcard UI (flip cards, deck management, progress tracker)'},
+      {m:0,t:'Quiz player UI (adaptive MCQ, scoring, answer explanations)'},
+      {m:0,t:'Report + Executive Brief download UI (PDF/DOCX export buttons)'},
+      {m:0,t:'Mind map + Knowledge graph viewer (interactive SVG, zoom/pan); Audio player UI'},
+      {m:1,t:'Studio API router; shared Gemini RAG pipeline reuse across all Studio tools'},
+      {m:1,t:'Quiz generator API (MCQ + short answer, configurable difficulty levels)'},
+      {m:1,t:'Report generator API (structured full-length report, DOCX/PDF export)'},
+      {m:1,t:'Slide deck creator API (PPTX export via python-pptx with citations)'},
+      {m:1,t:'Infographic builder API; Timeline generator (chronological event extraction)'},
+      {m:2,t:'Flashcard generator endpoint (Q&A pairs from workspace sources via Gemini)'},
+      {m:2,t:'Study guide generator (topic-by-topic summaries + key terms)'},
+      {m:2,t:'Oral exam simulator (Gemini conversational scoring + real-time feedback)'},
+      {m:2,t:'Mind map generator (interactive SVG concept tree); Data table extractor'},
+      {m:2,t:'Audio Overview endpoint (Gemini TTS two-host podcast from workspace sources)'},
+      {m:3,t:'Langfuse integration: Gemini token tracking, latency monitoring, cost alerts'},
+      {m:3,t:'Load testing baseline with k6; DB query optimisation pass'},
+      {m:3,t:'PII detection QA; auto rubric generator security review'},
+      {m:3,t:'Full Studio QA pass — all tools tested against real workspace content'},
+      {m:3,t:'Security audit of all source ingestion paths; PPTX/DOCX export hardening'},
+    ],
+    review:[
+      {q:'Do all learning tools (flashcards, quiz, study guide, oral exam) work from real docs?'},
+      {q:'Can a user export a cited report and a slide deck from workspace content?'},
+      {q:'Does the mind map and knowledge graph render correctly for 10+ source docs?'},
+      {q:'Is the audio overview generating podcast-style output correctly?'},
+    ]
+  },
+  {
+    n:4, label:'Sprint 4', days:'Days 16–20',
+    goal:'Build all 7 agentic AI workflows, run final QA, deploy to production, and prepare the demo',
+    deliverables:[
+      'All 7 Gemini agents live with approval checkpoints and transparency logs',
+      'Agent memory system (short-term Redis + long-term workspace DB)',
+      'Production deployment on Vercel + Google Cloud Run',
+      'Full security audit, load testing, and monitoring dashboards live',
+      'Demo video, user documentation, and final QA sign-off',
+    ],
+    tasks:[
+      {m:0,t:'Agent control panel UI (trigger agents, view status, approval checkpoint dialogs)'},
+      {m:0,t:'Agent transparency log UI (real-time action stream visible to all members)'},
+      {m:0,t:'UI polish pass: mobile responsiveness, dark mode, loading states, error handling'},
+      {m:0,t:'Final UI QA pass across all modules (auth, workspace, chat, studio, agents)'},
+      {m:0,t:'Record demo walkthrough video; prepare presentation slides for submission'},
+      {m:1,t:'Gemini function calling agent framework: planner, executor, tool registry, memory'},
+      {m:1,t:'Literature Review Agent + Knowledge Organizer Agent (Gemini function calling)'},
+      {m:1,t:'Project Manager Agent + Report Builder Agent; agent transparency log API'},
+      {m:1,t:'Performance optimisation: caching, DB indexes, API response times'},
+      {m:1,t:'API documentation; full integration test suite final run'},
+      {m:2,t:'Research Agent + Study Coach Agent (Gemini native function calling, end-to-end)'},
+      {m:2,t:'Debate Agent: pro/con synthesis via Gemini + comparison table generation'},
+      {m:2,t:'Agent memory system: Redis short-term task context + workspace DB long-term state'},
+      {m:2,t:'All 7 agents end-to-end QA with real workspace content and approval checkpoints'},
+      {m:2,t:'Gemini prompt final tuning pass; RAG accuracy QA on diverse test documents'},
+      {m:3,t:'Human-in-the-loop approval checkpoint middleware for all agent actions'},
+      {m:3,t:'Agent step limits + timeout enforcement; runaway loop prevention tested'},
+      {m:3,t:'Full security audit: RBAC, RLS, vector namespaces, agent permissions'},
+      {m:3,t:'Production deployment: Vercel (frontend) + Cloud Run (backend) go-live'},
+      {m:3,t:'Monitoring dashboards live (Langfuse + Cloud Logging); user documentation published'},
+    ],
+    review:[
+      {q:'Are all 7 agents live and triggerable with owner approval checkpoints?'},
+      {q:'Is the production deployment stable under realistic load?'},
+      {q:'Are all security audits (RBAC, RLS, namespace isolation) passing?'},
+      {q:'Is the demo ready and documentation complete for submission?'},
+    ]
+  },
+];
+
+const KEY = 'cm_sprints_v2';
+let state = {};
+try{ state = JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){}
+let activeSprint = 0;
+
+function save(){ try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){} }
+
+function taskKey(si,mi,ti){ return si+'-'+mi+'-'+ti; }
+
+function toggle(si,mi,ti){
+  const k = taskKey(si,mi,ti);
+  state[k] = !state[k];
+  save();
+  renderSprint();
+  renderOverall();
+}
+
+function renderOverall(){
+  let total=0,done=0;
+  SPRINTS.forEach((s,si)=>{
+    s.tasks.forEach((t,ti)=>{
+      total++;
+      if(state[taskKey(si,t.m,ti)]) done++;
+    });
+  });
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('overall-prog').style.width = pct+'%';
+  document.getElementById('overall-pct').textContent = pct+'%';
+}
+
+function renderTabs(){
+  document.getElementById('stabs').innerHTML = SPRINTS.map((s,i)=>`
+    <button class="stab${i===activeSprint?' active':''}" onclick="setSprint(${i})">${s.label} <span style="font-size:11px;opacity:.7">${s.days}</span></button>
+  `).join('');
+}
+
+function renderSprint(){
+  const s = SPRINTS[activeSprint];
+  const si = activeSprint;
+  const tasks = s.tasks;
+  const totalT = tasks.length;
+  const doneT = tasks.filter((t,ti)=>state[taskKey(si,t.m,ti)]).length;
+  const pct = totalT ? Math.round(doneT/totalT*100) : 0;
+
+  // group tasks by member
+  const byMember = MEMBERS.map(m=>({...m, tasks: tasks.map((t,ti)=>({...t,ti})).filter(t=>t.m===m.id)}));
+
+  let html = `
+    <div class="sprint-card">
+      <div class="sprint-title">${s.label} · ${s.days}</div>
+      <div class="sprint-goal">${s.goal}</div>
+      <div class="sprint-stats">
+        <span class="badge b-blue">${totalT} tasks</span>
+        <span class="badge b-warn">${totalT-doneT} open</span>
+        <span class="badge b-green">${doneT} done</span>
+        <span class="badge b-gray">${pct}% complete</span>
+      </div>
+      <div class="prog-wrap"><div class="prog-fill pc${si}" style="width:${pct}%"></div></div>
+    </div>
+
+    <div class="deliv-list">
+      <div class="deliv-title">Sprint deliverables (review checklist)</div>
+      ${s.deliverables.map(d=>`<div class="deliv"><div class="deliv-dot pc${si}"></div>${d}</div>`).join('')}
+    </div>
+
+    <div class="lanes">
+      ${byMember.map(m=>`
+        <div class="lane l${m.id}">
+          <div class="lane-head">
+            <div class="lane-avatar">${m.init}</div>
+            <div><div class="lane-name">${m.name}</div><div class="lane-role">${m.role}</div></div>
+          </div>
+          <div class="lane-tasks">
+            ${m.tasks.map(t=>{
+              const k = taskKey(si,t.m,t.ti);
+              const isDone = !!state[k];
+              return `<div class="task${isDone?' done':''}" onclick="toggle(${si},${t.m},${t.ti})">
+                <div class="chk${isDone?' done':''}">
+                  <svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <span class="task-txt">${t.t}</span>
+              </div>`;
+            }).join('')}
+          </div>
+          <div class="lane-foot">${m.tasks.filter(t=>state[taskKey(si,t.m,t.ti)]).length}/${m.tasks.length} done</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="review-box">
+      <div class="review-title">End-of-sprint review questions</div>
+      ${s.review.map((r,i)=>`<div class="review-item"><span>${i+1}.</span>${r.q}</div>`).join('')}
+    </div>
+  `;
+
+  document.getElementById('sprint-view').innerHTML = html;
+}
+
+window.setSprint = function(i){ activeSprint=i; renderTabs(); renderSprint(); }
+
+renderTabs();
+renderSprint();
+renderOverall();
+</script>

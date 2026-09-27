@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { getWorkspaces } from "@/lib/api";
 import { WorkspaceCard } from "@/components/WorkspaceCard";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
+import { LogoutButton } from "@/components/LogoutButton";
 import { Workspace } from "@/types";
 import { Loader2, LogIn, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,10 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-white tracking-tight">Workspaces</h1>
             <p className="text-slate-400 mt-2 text-sm">Select a workspace to enter CollabMind.</p>
           </div>
-          {errorType !== "UNAUTHORIZED" && <CreateWorkspaceDialog />}
+          <div className="flex items-center gap-3">
+            {errorType !== "UNAUTHORIZED" && <CreateWorkspaceDialog />}
+            <LogoutButton variant="outline" className="border-slate-800 text-slate-300 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20" />
+          </div>
         </header>
 
         {errorType === "UNAUTHORIZED" && (
