@@ -52,7 +52,7 @@ export default function Dashboard() {
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="flex items-center justify-between pb-6 border-b border-slate-800/60">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Workspaces</h1>
+            <h1 className="text-3xl font-serif font-semibold text-white tracking-tight">Workspaces</h1>
             <p className="text-slate-400 mt-2 text-sm">Select a workspace to enter CollabMind.</p>
           </div>
           <div className="flex items-center gap-3">

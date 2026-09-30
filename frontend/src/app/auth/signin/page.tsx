@@ -158,8 +158,8 @@ export default function SignIn() {
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-inner">
             <span className="text-indigo-400 font-bold text-2xl tracking-tighter">CM</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            {isSignUp ? "Create an Account" : "Welcome Back"}
+          <h1 className="text-2xl font-serif font-semibold tracking-tight text-white">
+            {isSignUp ? "Create an account" : "Welcome back"}
           </h1>
           <p className="text-sm text-slate-400">
             {isSignUp 
@@ -270,7 +270,7 @@ export default function SignIn() {
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-slate-800"></div>
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
+          <div className="relative flex justify-center text-xs">
             <span className="bg-slate-900 px-3 text-slate-500 font-medium">Or continue with</span>
           </div>
         </div>

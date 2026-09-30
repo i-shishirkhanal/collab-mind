@@ -39,7 +39,7 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
       {/* Studio Sidebar */}
       <div className="w-full lg:w-80 bg-slate-900 border-r border-slate-800/60 flex flex-col shrink-0 lg:h-full z-10 shadow-xl overflow-y-auto">
         <div className="p-6 border-b border-slate-800/60 bg-slate-900/50 sticky top-0 backdrop-blur-md">
-          <h1 className="text-xl font-bold text-white tracking-tight">Agent Studio</h1>
+          <h1 className="text-xl font-serif font-semibold text-white tracking-tight">Agent Studio</h1>
           <p className="text-slate-400 mt-1 text-sm">Deploy tools to your workspace sources.</p>
         </div>
         

@@ -51,6 +51,7 @@ class Citation(BaseModel):
     source_name: str
     page_number: Optional[int] = None
     chunk_index: int
+    excerpt: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

@@ -4,6 +4,46 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * CollabMind identity: warm ink neutrals instead of Tailwind's default
+ * blue-slate, and a citation-gold accent reserved for anything grounded in
+ * a real source (citations, verified answers). Overriding the slate and
+ * indigo scales here means every existing "slate" and "indigo" utility
+ * class across the app picks up the new palette without touching each
+ * component.
+ */
+@theme {
+  --color-slate-50: #f7f5f0;
+  --color-slate-100: #eeeae0;
+  --color-slate-200: #dfd8c8;
+  --color-slate-300: #c7bca5;
+  --color-slate-400: #a99c81;
+  --color-slate-500: #8c7f66;
+  --color-slate-600: #6d6350;
+  --color-slate-700: #514939;
+  --color-slate-800: #302a20;
+  --color-slate-900: #1c1811;
+  --color-slate-950: #0d0c0a;
+
+  --color-indigo-50: #fcf4e3;
+  --color-indigo-100: #f7e6bd;
+  --color-indigo-200: #efce86;
+  --color-indigo-300: #e6b85e;
+  --color-indigo-400: #dba23f;
+  --color-indigo-500: #cb8e2e;
+  --color-indigo-600: #b57a22;
+  --color-indigo-700: #93631b;
+  --color-indigo-800: #5b3d12;
+  --color-indigo-900: #3b280d;
+  --color-indigo-950: #241809;
+
+  /* Agent/AI accent — distinct from the human-gold accent, used sparingly */
+  --color-teal-400: #5fb3a6;
+  --color-teal-500: #429184;
+
+  --font-serif: var(--font-source-serif);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -48,72 +88,72 @@
 }
 
 :root {
-  --background: oklch(0.98 0 0);
-  --foreground: oklch(0.14 0.03 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.14 0.03 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.14 0.03 265);
-  --primary: oklch(0.58 0.23 277); /* indigo-500 */
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.96 0.01 265); /* slate-100 */
-  --secondary-foreground: oklch(0.27 0.03 265); /* slate-800 */
-  --muted: oklch(0.96 0.01 265);
-  --muted-foreground: oklch(0.45 0.03 265); /* slate-500 */
-  --accent: oklch(0.96 0.01 265);
-  --accent-foreground: oklch(0.27 0.03 265);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.01 265); /* slate-200 */
-  --input: oklch(0.92 0.01 265);
-  --ring: oklch(0.58 0.23 277);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  --background: #f7f5f0;
+  --foreground: #1c1811;
+  --card: #ffffff;
+  --card-foreground: #1c1811;
+  --popover: #ffffff;
+  --popover-foreground: #1c1811;
+  --primary: #b57a22; /* gold-600 */
+  --primary-foreground: #fcf4e3;
+  --secondary: #eeeae0;
+  --secondary-foreground: #302a20;
+  --muted: #eeeae0;
+  --muted-foreground: #6d6350;
+  --accent: #eeeae0;
+  --accent-foreground: #302a20;
+  --destructive: #c4574b;
+  --border: #dfd8c8;
+  --input: #dfd8c8;
+  --ring: #b57a22;
+  --chart-1: #dba23f;
+  --chart-2: #cb8e2e;
+  --chart-3: #b57a22;
+  --chart-4: #93631b;
+  --chart-5: #5b3d12;
   --radius: 0.625rem;
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.14 0.03 265);
-  --sidebar-primary: oklch(0.58 0.23 277);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.96 0.01 265);
-  --sidebar-accent-foreground: oklch(0.27 0.03 265);
-  --sidebar-border: oklch(0.92 0.01 265);
-  --sidebar-ring: oklch(0.58 0.23 277);
+  --sidebar: #f7f5f0;
+  --sidebar-foreground: #1c1811;
+  --sidebar-primary: #b57a22;
+  --sidebar-primary-foreground: #fcf4e3;
+  --sidebar-accent: #eeeae0;
+  --sidebar-accent-foreground: #302a20;
+  --sidebar-border: #dfd8c8;
+  --sidebar-ring: #b57a22;
 }
 
 .dark {
-  --background: oklch(0.21 0.034 265); /* slate-900 */
-  --foreground: oklch(0.98 0 0); /* slate-50 */
-  --card: oklch(0.279 0.041 260); /* slate-800 */
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.279 0.041 260);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.6 0.2 277); /* indigo-400 for better contrast */
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.35 0.04 265); /* slate-700 */
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.35 0.04 265);
-  --muted-foreground: oklch(0.7 0.03 265); /* slate-400 */
-  --accent: oklch(0.35 0.04 265);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.35 0.04 265);
-  --input: oklch(0.35 0.04 265);
-  --ring: oklch(0.6 0.2 277);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.21 0.034 265);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.6 0.2 277);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.279 0.041 260);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.35 0.04 265);
-  --sidebar-ring: oklch(0.6 0.2 277);
+  --background: #100e0a; /* warm ink, not blue-slate */
+  --foreground: #f2eee4;
+  --card: #1c1811;
+  --card-foreground: #f2eee4;
+  --popover: #1c1811;
+  --popover-foreground: #f2eee4;
+  --primary: #dba23f; /* gold-400, tuned for contrast on ink */
+  --primary-foreground: #241809;
+  --secondary: #302a20;
+  --secondary-foreground: #f2eee4;
+  --muted: #302a20;
+  --muted-foreground: #a99c81;
+  --accent: #302a20;
+  --accent-foreground: #f2eee4;
+  --destructive: #d9776c;
+  --border: #302a20;
+  --input: #302a20;
+  --ring: #dba23f;
+  --chart-1: #dba23f;
+  --chart-2: #cb8e2e;
+  --chart-3: #b57a22;
+  --chart-4: #93631b;
+  --chart-5: #5b3d12;
+  --sidebar: #100e0a;
+  --sidebar-foreground: #f2eee4;
+  --sidebar-primary: #dba23f;
+  --sidebar-primary-foreground: #241809;
+  --sidebar-accent: #1c1811;
+  --sidebar-accent-foreground: #f2eee4;
+  --sidebar-border: #302a20;
+  --sidebar-ring: #dba23f;
 }
 
 @layer base {

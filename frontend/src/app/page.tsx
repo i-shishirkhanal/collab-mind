@@ -29,8 +29,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden">
       {/* Background Decorative Glow Effects */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-indigo-600/20 via-purple-600/10 to-transparent blur-[140px] pointer-events-none rounded-full" />
-      <div className="absolute top-96 left-[-100px] w-[500px] h-[500px] bg-blue-600/10 blur-[160px] pointer-events-none rounded-full" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-indigo-600/20 via-indigo-600/10 to-transparent blur-[140px] pointer-events-none rounded-full" />
+      <div className="absolute top-96 left-[-100px] w-[500px] h-[500px] bg-indigo-600/10 blur-[160px] pointer-events-none rounded-full" />
       <div className="absolute bottom-96 right-[-100px] w-[500px] h-[500px] bg-indigo-600/10 blur-[160px] pointer-events-none rounded-full" />
 
       {/* Grid pattern overlay */}
@@ -78,17 +78,14 @@ export default function Home() {
         <div className="max-w-5xl mx-auto text-center space-y-8">
           
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-950/60 border border-indigo-800/50 text-indigo-300 text-xs font-semibold tracking-wide backdrop-blur-md shadow-inner animate-pulse">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Introducing CollabMind AI 2.0 • Autonomous Research & Study Assistant</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-950/60 border border-indigo-800/50 text-indigo-300 text-xs font-semibold backdrop-blur-md shadow-inner">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>CollabMind AI 2.0 — built for teams, grounded in your sources</span>
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1]">
-            Turn Raw Documents into{" "}
-            <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-cyan-400 bg-clip-text text-transparent">
-              Intelligent Team Workspaces
-            </span>
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-semibold tracking-tight text-white leading-[1.1]">
+            Turn raw documents into workspaces your whole team can reason with
           </h1>
 
           {/* Subheading */}
@@ -184,7 +181,7 @@ export default function Home() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
                     <span className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-purple-400" /> AI Grounded Chat
+                      <MessageSquare className="w-4 h-4 text-indigo-400" /> AI Grounded Chat
                     </span>
                     <span className="text-xs text-slate-500">Gemini 1.5 Flash</span>
                   </div>
@@ -214,7 +211,7 @@ export default function Home() {
               <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800/60 space-y-3">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
                   <span className="flex items-center gap-2">
-                    <Brain className="w-4 h-4 text-cyan-400" /> Generated Studio Artifacts
+                    <Brain className="w-4 h-4 text-teal-400" /> Generated Studio Artifacts
                   </span>
                   <span className="text-xs text-amber-400 font-mono">10 Flashcards</span>
                 </div>
@@ -241,9 +238,8 @@ export default function Home() {
         <div className="max-w-6xl mx-auto space-y-12">
           
           <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <h2 className="text-xs uppercase font-bold tracking-wider text-indigo-400">Interactive Workflow</h2>
-            <h3 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-              One Unified Workspace for Your Entire Research Lifecycle
+            <h3 className="text-3xl md:text-4xl font-serif font-semibold text-white tracking-tight">
+              One workspace for your entire research lifecycle
             </h3>
             <p className="text-slate-400 text-sm">
               Explore how CollabMind connects document indexing, AI generation, and autonomous agents in real time.
@@ -316,7 +312,7 @@ export default function Home() {
             {activeTab === "studio" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                 <div className="space-y-4">
-                  <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">
+                  <span className="text-xs font-mono text-teal-400 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
                     Automated Study Artifacts
                   </span>
                   <h4 className="text-2xl font-bold text-white">Generate Quizzes, Flashcards & Study Guides</h4>
@@ -352,7 +348,7 @@ export default function Home() {
             {activeTab === "agent" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                 <div className="space-y-4">
-                  <span className="text-xs font-mono text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
+                  <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
                     LangGraph Agent Architecture
                   </span>
                   <h4 className="text-2xl font-bold text-white">Study Coach Agent with Human Approval</h4>
@@ -372,7 +368,7 @@ export default function Home() {
                   </ul>
                 </div>
                 <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3 font-mono text-xs">
-                  <div className="flex items-center gap-2 text-purple-400 font-semibold border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-2 text-indigo-400 font-semibold border-b border-slate-800 pb-2">
                     <Bot className="w-4 h-4" /> Agent Graph Pipeline
                   </div>
                   <div className="space-y-2 text-[11px]">
@@ -438,9 +434,8 @@ export default function Home() {
         <div className="max-w-6xl mx-auto space-y-16">
           
           <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <h2 className="text-xs uppercase font-bold tracking-wider text-indigo-400">Core Architecture</h2>
-            <h3 className="text-3xl md:text-5xl font-bold text-white tracking-tight">
-              Engineered for Speed, Precision & Scalability
+            <h3 className="text-3xl md:text-5xl font-serif font-semibold text-white tracking-tight">
+              Engineered for speed, precision and scale
             </h3>
             <p className="text-slate-400 text-sm">
               Built with Next.js 16, Node.js microservices, PostgreSQL pgvector, FastAPI, and Gemini 1.5 models.
@@ -458,8 +453,8 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 hover:border-purple-500/40 p-8 rounded-3xl space-y-4 transition-all hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-indigo-500/40 p-8 rounded-3xl space-y-4 transition-all hover:-translate-y-1">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                 <Brain className="w-6 h-6" />
               </div>
               <h4 className="text-xl font-semibold text-white">AI Studio Generator</h4>
@@ -468,8 +463,8 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 hover:border-cyan-500/40 p-8 rounded-3xl space-y-4 transition-all hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-teal-500/40 p-8 rounded-3xl space-y-4 transition-all hover:-translate-y-1">
+              <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
                 <Bot className="w-6 h-6" />
               </div>
               <h4 className="text-xl font-semibold text-white">LangGraph AI Agent</h4>
@@ -486,8 +481,7 @@ export default function Home() {
       <section id="faq" className="py-24 px-6 border-t border-slate-800/60 bg-slate-950/80">
         <div className="max-w-4xl mx-auto space-y-12">
           <div className="text-center space-y-3">
-            <h2 className="text-xs uppercase font-bold tracking-wider text-indigo-400">Frequently Asked Questions</h2>
-            <h3 className="text-3xl font-bold text-white tracking-tight">Everything You Need to Know</h3>
+            <h3 className="text-3xl font-serif font-semibold text-white tracking-tight">Frequently asked questions</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -536,7 +530,7 @@ export default function Home() {
 
       {/* High-Impact Bottom Call to Action (CTA) Banner */}
       <section className="py-20 px-6 relative">
-        <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-r from-indigo-900/80 via-purple-900/80 to-slate-900 border border-indigo-500/30 p-10 md:p-16 text-center space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-indigo-900/60 to-slate-900 border border-indigo-500/30 p-10 md:p-16 text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none" />
           
           <h3 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">

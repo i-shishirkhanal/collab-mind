@@ -49,6 +49,28 @@ const addMember = async (workspaceId, email, role = 'member') => {
 };
 
 /**
+ * updateMemberRole
+ * ─────────────────
+ * Changes a member's role within a workspace.
+ *
+ * @param {string} workspaceId
+ * @param {string} userId
+ * @param {string} role         - 'member' | 'admin' | 'owner'
+ * @returns {Promise<Object|null>} - The updated row, or null if not a member
+ */
+const updateMemberRole = async (workspaceId, userId, role) => {
+  const { rows } = await pool.query(
+    `UPDATE workspace_members
+        SET role = $3
+      WHERE workspace_id = $1
+        AND user_id      = $2
+     RETURNING *`,
+    [workspaceId, userId, role],
+  );
+  return rows[0] || null;
+};
+
+/**
  * removeMember
  * ─────────────
  * Removes a user from a workspace.
@@ -78,7 +100,7 @@ const removeMember = async (workspaceId, userId) => {
  */
 const listMembers = async (workspaceId) => {
   const { rows } = await pool.query(
-    `SELECT u.id, u.email, u.name, u.avatar_url, wm.role, wm.joined_at
+    `SELECT u.id, u.id AS user_id, u.email, u.name, u.avatar_url, wm.role, wm.joined_at
        FROM workspace_members wm
        JOIN users u ON u.id = wm.user_id
       WHERE wm.workspace_id = $1
@@ -88,4 +110,4 @@ const listMembers = async (workspaceId) => {
   return rows;
 };
 
-module.exports = { addMember, removeMember, listMembers };
+module.exports = { addMember, removeMember, listMembers, updateMemberRole };

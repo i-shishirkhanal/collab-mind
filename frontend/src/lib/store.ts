@@ -6,7 +6,6 @@ import { Workspace, WorkspaceMember, Source, ChatMessage, Citation } from '@/typ
 // ========================
 interface ChatState {
   messages: ChatMessage[];
-  citations: { [id: string]: Citation[] };
   isLoading: boolean;
   activeCitation: Citation | null;
   addMessage: (message: ChatMessage) => void;
@@ -17,7 +16,6 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>((set) => ({
   messages: [],
-  citations: {},
   isLoading: false,
   activeCitation: null,
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
@@ -29,19 +27,36 @@ export const useChatStore = create<ChatState>((set) => ({
 // ========================
 // Presence Store
 // ========================
+interface TypingUser {
+  userId: string;
+  name: string;
+}
+
 interface PresenceState {
   onlineMembers: string[]; // List of user IDs
+  typingUsers: TypingUser[];
   setOnline: (userId: string) => void;
   setOffline: (userId: string) => void;
+  setTyping: (user: TypingUser) => void;
+  clearTyping: (userId: string) => void;
 }
 
 export const usePresenceStore = create<PresenceState>((set) => ({
   onlineMembers: [],
+  typingUsers: [],
   setOnline: (userId) => set((state) => ({
     onlineMembers: state.onlineMembers.includes(userId) ? state.onlineMembers : [...state.onlineMembers, userId]
   })),
   setOffline: (userId) => set((state) => ({
     onlineMembers: state.onlineMembers.filter(id => id !== userId)
+  })),
+  setTyping: (user) => set((state) => ({
+    typingUsers: state.typingUsers.some(u => u.userId === user.userId)
+      ? state.typingUsers
+      : [...state.typingUsers, user]
+  })),
+  clearTyping: (userId) => set((state) => ({
+    typingUsers: state.typingUsers.filter(u => u.userId !== userId)
   })),
 }));
 

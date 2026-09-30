@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageSquare, FileText, MonitorPlay, Users, Loader2, ArrowLeft } from "lucide-react";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { useSocket } from "@/hooks/useSocket";
+import { SocketProvider } from "@/hooks/SocketProvider";
 import { usePresenceStore } from "@/lib/store";
 import { LogoutButton } from "@/components/LogoutButton";
 
@@ -21,9 +21,6 @@ export default function WorkspaceLayout({
   const { workspace, members, loading, error } = useWorkspace(id);
   const pathname = usePathname();
   const onlineMembers = usePresenceStore(s => s.onlineMembers);
-  
-  // Initialize Socket connection bound to this workspace
-  useSocket(id);
 
   const navItems = [
     { name: "Chat", href: `/workspace/${id}/chat`, icon: MessageSquare },
@@ -41,6 +38,7 @@ export default function WorkspaceLayout({
   }
 
   return (
+    <SocketProvider workspaceId={id}>
     <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-50">
       {/* Sidebar - 240px */}
       <aside className="w-[240px] bg-slate-900 border-r border-slate-800/60 hidden md:flex flex-col shrink-0">
@@ -85,10 +83,10 @@ export default function WorkspaceLayout({
         {/* Member Avatars & Logout */}
         <div className="p-4 border-t border-slate-800/60 space-y-4">
           <div>
-            <div className="text-xs font-medium text-slate-500 mb-3 px-1 uppercase tracking-wider">Team Activity</div>
+            <div className="text-xs font-medium text-slate-500 mb-3 px-1">Team activity</div>
             <div className="flex flex-wrap gap-2 px-1">
               {members.slice(0, 8).map(member => {
-                const initials = member.name.substring(0,2).toUpperCase();
+                const initials = (member.name || member.email || "?").substring(0,2).toUpperCase();
                 const isOnline = onlineMembers.includes(member.user_id);
                 return (
                   <div key={member.id} className="relative group cursor-pointer" title={member.name}>
@@ -145,5 +143,6 @@ export default function WorkspaceLayout({
         {children}
       </main>
     </div>
+    </SocketProvider>
   );
 }

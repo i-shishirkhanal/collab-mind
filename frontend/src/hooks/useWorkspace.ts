@@ -4,6 +4,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { getWorkspace, getMembers, getSources } from '@/lib/api';
 import { useWorkspaceStore } from '@/lib/store';
 
+// Backend list endpoints return a plain array; some wrap it as { members: [...] }
+// or { sources: [...] }. Accept either so a response-shape change on one side
+// doesn't silently empty the UI on the other.
+function asList<T>(value: any, key: string): T[] {
+  if (Array.isArray(value)) return value;
+  if (value && Array.isArray(value[key])) return value[key];
+  return [];
+}
+
 export const useWorkspace = (workspaceId: string) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,13 +53,13 @@ export const useWorkspace = (workspaceId: string) => {
       }
 
       if (mData.status === 'fulfilled' && mData.value) {
-        setMembers(mData.value.members || []);
+        setMembers(asList(mData.value, 'members'));
       } else {
         setMembers([]);
       }
 
       if (sData.status === 'fulfilled' && sData.value) {
-        setSources(sData.value.sources || []);
+        setSources(asList(sData.value, 'sources'));
       } else {
         setSources([]);
       }
@@ -77,7 +86,7 @@ export const useWorkspace = (workspaceId: string) => {
     if (!workspaceId) return;
     try {
       const sData = await getSources(workspaceId);
-      setSources(sData.sources || []);
+      setSources(asList(sData, 'sources'));
     } catch (err) {
       console.error(err);
     }

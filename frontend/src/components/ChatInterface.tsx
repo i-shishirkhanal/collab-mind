@@ -3,10 +3,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Loader2 } from "lucide-react";
 
-import { useChatStore } from "@/lib/store";
+import { useChatStore, usePresenceStore } from "@/lib/store";
 import { getChatHistory, sendChat } from "@/lib/api";
 import { ChatMessage } from "./ChatMessage";
 import { CitationPanel } from "./CitationPanel";
+import { useSocketContext } from "@/hooks/SocketProvider";
 
 export function ChatInterface({ workspaceId }: { workspaceId: string }) {
   const [input, setInput] = useState("");
@@ -17,10 +18,13 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
   const setLoading = useChatStore(s => s.setLoading);
   const activeCitation = useChatStore(s => s.activeCitation);
   const setActiveCitation = useChatStore(s => s.setActiveCitation);
-  
+  const typingUsers = usePresenceStore(s => s.typingUsers);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Socket is initialized by the workspace layout, no duplicate needed here
+  // Socket is initialized by the workspace layout's SocketProvider; reuse it here
+  const { sendTyping } = useSocketContext();
+  const typingStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch initial history
   useEffect(() => {
@@ -59,7 +63,9 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
     addMessage(userMsg);
     setInput("");
     setLoading(true);
-    
+    sendTyping(false);
+    if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'; // Reset size
     }
@@ -119,6 +125,21 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
               </div>
             </div>
           )}
+
+          {typingUsers.length > 0 && (
+            <div className="flex items-center gap-2 mb-4 pl-12 text-xs text-slate-500">
+              <div className="flex gap-1">
+                <div className="w-1 h-1 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1 h-1 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1 h-1 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+              <span className="italic">
+                {typingUsers.length === 1
+                  ? `${typingUsers[0].name} is typing…`
+                  : `${typingUsers.map(u => u.name).join(', ')} are typing…`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -131,6 +152,9 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
             onChange={(e) => {
               setInput(e.target.value);
               autoResize();
+              sendTyping(true);
+              if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+              typingStopTimer.current = setTimeout(() => sendTyping(false), 2000);
             }}
             onKeyDown={onKeyDown}
             placeholder="Ask anything about your workspace sources... (Shift+Enter for newline)"
@@ -147,7 +171,7 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
           </button>
         </div>
         <div className="text-center mt-2">
-          <span className="text-[10px] text-slate-500 font-medium tracking-wide">AI CAN MAKE MISTAKES. VERIFY CRITICAL RESEARCH.</span>
+          <span className="text-[11px] text-slate-500">AI can make mistakes. Verify anything critical against the source.</span>
         </div>
       </div>
 

@@ -23,6 +23,11 @@ def _build_prompt(
         "If the answer cannot be found in the passages, say exactly:\n"
         "\"I could not find an answer in your workspace sources.\"\n"
         "Do NOT use any outside knowledge. Do NOT make up information.\n\n"
+        "CITATIONS: Every factual claim must be followed by the bracketed number(s) of the "
+        "passage(s) it came from, matching the CONTEXT PASSAGES numbering exactly, e.g. "
+        "\"Photosynthesis converts light into energy [1].\" or \"...as shown in two sources [1][3].\" "
+        "Place the citation immediately after the sentence it supports, not at the end of the "
+        "whole answer. Never invent a passage number that isn't listed below.\n\n"
     )
 
     context_section = "=== CONTEXT PASSAGES ===\n"
@@ -44,10 +49,13 @@ def _build_prompt(
 def _extract_citations(chunks: list[dict]) -> list[Citation]:
     citations = []
     for chunk in chunks:
+        content = chunk["content"] or ""
+        excerpt = content[:280] + ("…" if len(content) > 280 else "")
         citations.append(Citation(
             source_name=chunk["source_name"],
             page_number=chunk.get("page_number"),
             chunk_index=chunk["chunk_index"],
+            excerpt=excerpt,
         ))
     return citations
 
@@ -80,5 +88,5 @@ async def run_rag_pipeline(
 
     # Context extraction fallback when API key is missing/invalid
     excerpt = chunks[0]["content"][:300] if chunks else ""
-    answer = f"Based on your workspace source ({chunks[0]['source_name']}):\n\n{excerpt}"
+    answer = f"Based on your workspace source ({chunks[0]['source_name']}) [1]:\n\n{excerpt}"
     return answer, citations

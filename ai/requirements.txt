@@ -24,3 +24,4 @@ langchain-google-genai>=1.0.0          # LangChain ↔ Gemini integration
 # ── Utilities ──────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0        # Loads .env file into os.environ automatically
 redis[asyncio]>=5.0.0       # Async pub/sub and KV store for agent statuses
+httpx>=0.27.0                # HTTP client used to fetch web-page/URL sources

@@ -13,12 +13,16 @@ export const useSocket = (workspaceId?: string) => {
   
   const setOnline = usePresenceStore(s => s.setOnline);
   const setOffline = usePresenceStore(s => s.setOffline);
+  const setTyping = usePresenceStore(s => s.setTyping);
+  const clearTyping = usePresenceStore(s => s.clearTyping);
   const addMessage = useChatStore(s => s.addMessage);
+  const typingTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     if (typeof window === "undefined" || !workspaceId) return;
-    
-    const token = (session as any)?.user?.id || (session as any)?.accessToken || 'demo-guest-token';
+
+    const userId = (session as any)?.user?.id;
+    const token = (session as any)?.accessToken || userId || 'demo-guest-token';
 
     const socket = io(WS_URL, {
       path: '/socket.io',
@@ -38,22 +42,50 @@ export const useSocket = (workspaceId?: string) => {
       console.warn('Socket connection status:', err.message);
     });
 
-    socket.on('workspace:member-online', ({ userId }) => setOnline(userId));
-    socket.on('workspace:member-offline', ({ userId }) => setOffline(userId));
-    socket.on('chat:message', (data) => addMessage(data.message));
-    
+    socket.on('workspace:joined', () => {
+      if (userId) setOnline(userId);
+    });
+
+    socket.on('presence:sync', ({ onlineUsers }: { onlineUsers: { userId: string }[] }) => {
+      onlineUsers.forEach((u) => setOnline(u.userId));
+    });
+    socket.on('workspace:member-online', ({ userId: uid }) => setOnline(uid));
+    socket.on('workspace:member-offline', ({ userId: uid }) => setOffline(uid));
+    socket.on('chat:message', (data) => addMessage(data.message ?? data));
+
+    socket.on('presence:typing', ({ userId: uid, name, isTyping }: { userId: string; name: string; isTyping: boolean }) => {
+      if (uid === userId) return; // ignore our own echo, if any
+      const timeouts = typingTimeouts.current;
+      const existing = timeouts.get(uid);
+      if (existing) clearTimeout(existing);
+
+      if (isTyping) {
+        setTyping({ userId: uid, name });
+        timeouts.set(uid, setTimeout(() => {
+          clearTyping(uid);
+          timeouts.delete(uid);
+        }, 4000));
+      } else {
+        clearTyping(uid);
+        timeouts.delete(uid);
+      }
+    });
+
+    const timeouts = typingTimeouts.current;
     return () => {
+      timeouts.forEach((t) => clearTimeout(t));
+      timeouts.clear();
       socket.disconnect();
     };
-  }, [workspaceId, session, setOnline, setOffline, addMessage]);
+  }, [workspaceId, session, setOnline, setOffline, setTyping, clearTyping, addMessage]);
 
   const sendMessage = (content: string) => {
-    socketRef.current?.emit('chat:send', { workspaceId, content });
-  };
-  
-  const sendTyping = () => {
-    socketRef.current?.emit('chat:typing', { workspaceId });
+    socketRef.current?.emit('chat:message', { content });
   };
 
-  return { socket: socketRef.current, sendMessage, sendTyping };
+  const sendTyping = (isTyping: boolean) => {
+    socketRef.current?.emit('presence:typing', { isTyping });
+  };
+
+  return { sendMessage, sendTyping };
 };

@@ -20,7 +20,7 @@ export function MemberList({ members }: { members: Member[] }) {
               <div className="relative">
                 <Avatar className="w-8 h-8 border border-slate-700">
                   <AvatarFallback className="bg-slate-700 text-slate-300 text-xs font-medium">
-                    {member.name.substring(0, 2).toUpperCase()}
+                    {(member.name || member.email || "?").substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${member.isOnline ? 'bg-emerald-500' : 'bg-slate-500'}`} />

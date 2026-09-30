@@ -18,8 +18,8 @@ export function CitationPanel({ citation, onClose }: CitationPanelProps) {
       {citation && (
         <div className="flex flex-col h-full bg-slate-900 overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-slate-800 shrink-0 bg-slate-900/80 backdrop-blur-sm">
-            <h3 className="font-semibold text-slate-200">Source Details</h3>
-            <button 
+            <h3 className="font-serif font-semibold text-slate-200">Source</h3>
+            <button
               onClick={onClose}
               className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             >
@@ -28,12 +28,12 @@ export function CitationPanel({ citation, onClose }: CitationPanelProps) {
           </div>
           <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
             <div>
-              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-1.5">Document</p>
+              <p className="text-xs font-medium text-indigo-400 mb-1.5">Document</p>
               <p className="text-sm font-medium text-slate-200 break-words">{citation.source_name}</p>
             </div>
             {citation.page_number && (
               <div>
-                <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-1.5">Page</p>
+                <p className="text-xs font-medium text-indigo-400 mb-1.5">Page</p>
                 <div className="inline-flex items-center justify-center bg-slate-800 border border-slate-700 rounded text-slate-300 text-xs px-2 py-1">
                   Page {citation.page_number}
                 </div>
@@ -41,10 +41,10 @@ export function CitationPanel({ citation, onClose }: CitationPanelProps) {
             )}
             {citation.excerpt && (
               <div>
-                <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-1.5">Excerpt</p>
-                 <div className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl text-slate-300 text-sm leading-relaxed relative">
+                <p className="text-xs font-medium text-indigo-400 mb-1.5">Excerpt</p>
+                 <div className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl text-slate-300 text-sm font-serif leading-relaxed relative">
                   <div className="absolute -left-1.5 top-4 bottom-4 w-1 bg-indigo-500/50 rounded-r-full"></div>
-                  "{citation.excerpt}"
+                  &ldquo;{citation.excerpt}&rdquo;
                 </div>
               </div>
             )}

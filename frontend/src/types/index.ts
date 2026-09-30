@@ -18,7 +18,7 @@ export interface WorkspaceMember {
   id: string;
   user_id: string;
   workspace_id: string;
-  role: 'owner' | 'admin' | 'editor' | 'viewer';
+  role: 'owner' | 'admin' | 'member';
   name: string;
   email: string;
   online?: boolean;
@@ -47,6 +47,7 @@ export interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
   citations?: Citation[];
+  metadata?: { citations?: Citation[] };
   created_at: string;
 }
 

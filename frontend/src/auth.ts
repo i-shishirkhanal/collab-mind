@@ -20,7 +20,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email) return null;
         const email = credentials.email as string;
-        const inputName = credentials.name as string | undefined;
+        // NextAuth's client form-encodes a JS `undefined` value as the
+        // literal string "undefined", so an absent name must be filtered
+        // here rather than trusted as-is.
+        const rawName = credentials.name as string | undefined;
+        const inputName = rawName && rawName !== "undefined" && rawName.trim() ? rawName.trim() : undefined;
         const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
         try {
           const res = await fetch(`${API_URL}/api/auth/email`, {

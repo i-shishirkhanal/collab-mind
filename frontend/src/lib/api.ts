@@ -114,8 +114,15 @@ export const getWorkspaceMembers = (workspaceId: string) =>
   apiCall(`/api/workspaces/${workspaceId}/members`);
 export const getMembers = getWorkspaceMembers;
 
-export const addWorkspaceMember = (workspaceId: string, email: string, role: string = 'member') => 
+export const addWorkspaceMember = (workspaceId: string, email: string, role: string = 'member') =>
   apiCall(`/api/workspaces/${workspaceId}/members`, { method: 'POST', body: JSON.stringify({ email, role }) });
+export const inviteMember = addWorkspaceMember;
+
+export const updateMemberRole = (workspaceId: string, userId: string, role: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) });
+
+export const removeMember = (workspaceId: string, userId: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' });
 
 // Chat API
 export const sendChatMessage = (workspaceId: string, message: string, conversation_history: any[] = []) => 

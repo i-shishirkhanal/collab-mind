@@ -34,6 +34,20 @@ router.post(
 );
 
 /**
+ * PATCH /workspaces/:workspaceId/members/:userId
+ * Change a member's role. Only owners may change roles.
+ * Body: { role }
+ * Middleware: authenticate → requireWorkspaceMember → requireRole('owner')
+ */
+router.patch(
+  '/:workspaceId/members/:userId',
+  authenticate,
+  requireWorkspaceMember,
+  requireRole('owner'),
+  memberController.updateMemberRole,
+);
+
+/**
  * DELETE /workspaces/:workspaceId/members/:userId
  * Remove a member by their user id. Only owners may remove members.
  * Middleware: authenticate → requireWorkspaceMember → requireRole('owner')

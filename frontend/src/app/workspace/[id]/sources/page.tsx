@@ -108,7 +108,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
       <div className="max-w-5xl mx-auto space-y-10">
         
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Data Sources</h1>
+          <h1 className="text-2xl font-serif font-semibold text-white tracking-tight">Sources</h1>
           <p className="text-sm text-slate-400 mt-1">Manage, index, and summarize the documents that power your workspace AI context.</p>
         </div>
 

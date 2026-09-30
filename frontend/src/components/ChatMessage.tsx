@@ -8,10 +8,13 @@ interface ChatMessageProps {
   message: ChatMessageType;
 }
 
+const NOT_FOUND_MESSAGE = "I could not find an answer in your workspace sources.";
+
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
-  const citationsDict = useChatStore(s => s.citations);
+  const citations = message.metadata?.citations ?? message.citations ?? [];
   const setActiveCitation = useChatStore(s => s.setActiveCitation);
+  const isUngrounded = !isUser && message.content.trim() === NOT_FOUND_MESSAGE;
 
   // Parse inline citations like [1], [2]
   const parseInlineCitations = (text: string) => {
@@ -27,8 +30,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       const numStr = match[1];
       const index = parseInt(numStr, 10) - 1;
-      const citationList = citationsDict[message.id];
-      const citation = citationList && citationList[index] ? citationList[index] : null;
+      const citation = citations[index] ?? null;
 
       if (citation) {
          parts.push(
@@ -57,26 +59,35 @@ export function ChatMessage({ message }: ChatMessageProps) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6 group`}>
       <div className={`flex gap-4 max-w-[85%] ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-        
+
         {/* Avatar */}
         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 shadow-sm ${
-          isUser 
+          isUser
             ? "bg-slate-700 border-slate-600 text-slate-300" // Note: If we had a user, we'd use their initials, but for now we fallback
-            : "bg-indigo-900/50 border-indigo-500/50 text-indigo-400"
+            : "bg-teal-500/15 border-teal-500/50 text-teal-400"
         }`}>
           {isUser ? <span className="text-xs font-bold">U</span> : <span className="text-xs font-bold">CM</span>}
         </div>
 
         {/* Bubble */}
         <div className={`px-5 py-3.5 rounded-2xl shadow-sm text-[15px] leading-relaxed relative ${
-          isUser 
-            ? "bg-slate-700 text-slate-100 rounded-tr-sm" 
-            : "bg-slate-800 border border-slate-700/50 text-slate-200 rounded-tl-sm shadow-indigo-500/5"
+          isUser
+            ? "bg-slate-700 text-slate-100 rounded-tr-sm"
+            : isUngrounded
+              ? "bg-slate-800/60 border border-dashed border-slate-600 text-slate-400 rounded-tl-sm italic"
+              : "bg-slate-800 border border-slate-700/50 text-slate-200 rounded-tl-sm"
         }`}>
           <div className="whitespace-pre-wrap">
             {isUser ? message.content : parseInlineCitations(message.content)}
           </div>
-          
+
+          {!isUser && !isUngrounded && citations.length > 0 && (
+            <div className="mt-2.5 pt-2.5 border-t border-slate-700/50 flex items-center gap-1.5 text-[11px] text-indigo-400/90 not-italic">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/70" />
+              Grounded in {citations.length} source{citations.length > 1 ? "s" : ""}
+            </div>
+          )}
+
           <div className={`absolute bottom-0 translate-y-full pt-1 text-[10px] text-slate-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity ${isUser ? 'right-1' : 'left-1'}`}>
              {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>

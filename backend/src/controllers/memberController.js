@@ -41,6 +41,38 @@ const addMember = async (req, res, next) => {
 };
 
 /**
+ * updateMemberRole — PATCH /workspaces/:workspaceId/members/:userId
+ * Body: { role: 'member' | 'admin' | 'owner' }
+ * Requires owner role. An owner cannot change their own role (would risk
+ * leaving the workspace without an owner).
+ */
+const updateMemberRole = async (req, res, next) => {
+  try {
+    const { workspaceId, userId } = req.params;
+    const { role } = req.body;
+
+    const validRoles = ['member', 'admin', 'owner'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: `role must be one of: ${validRoles.join(', ')}` });
+    }
+
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'You cannot change your own role' });
+    }
+
+    const membership = await memberService.updateMemberRole(workspaceId, userId, role);
+
+    if (!membership) {
+      return res.status(404).json({ error: 'Member not found in this workspace' });
+    }
+
+    res.json(membership);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * removeMember — DELETE /workspaces/:workspaceId/members/:userId
  * Requires owner role. Owners cannot remove themselves (guard below).
  */
@@ -65,4 +97,4 @@ const removeMember = async (req, res, next) => {
   }
 };
 
-module.exports = { listMembers, addMember, removeMember };
+module.exports = { listMembers, addMember, removeMember, updateMemberRole };

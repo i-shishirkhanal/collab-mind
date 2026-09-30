@@ -86,14 +86,24 @@ module.exports = {
           socket.join(room);
           socket.workspaceId = workspaceId; // attach to socket for subsequent events
           socket.role = 'owner';
-          
+
           console.log(`[Socket] User ${socket.user.id} joined ${room}`);
-          
+
           // Register handlers now that we are securely in a workspace room
           registerHandlers(io, socket);
 
-          // Broadcast join event to everyone else in this workspace
-          socket.to(room).emit('workspace:join', {
+          // Tell the newly-joined client who is already online in this room,
+          // since they only get future join/leave events from here on.
+          const existingSockets = await io.in(room).fetchSockets();
+          const onlineUsers = [...new Map(
+            existingSockets
+              .filter((s) => s.id !== socket.id && s.user)
+              .map((s) => [s.user.id, { userId: s.user.id, name: s.user.name }])
+          ).values()];
+          socket.emit('presence:sync', { onlineUsers });
+
+          // Broadcast presence to everyone else in this workspace
+          socket.to(room).emit('workspace:member-online', {
             userId: socket.user.id,
             name: socket.user.name,
             timestamp: new Date()
@@ -109,13 +119,20 @@ module.exports = {
         }
       });
 
-      socket.on('disconnect', () => {
+      socket.on('disconnect', async () => {
         console.log(`[Socket] User ${socket.user.id} disconnected. Socket ID: ${socket.id}`);
         if (socket.workspaceId) {
-          io.to(`workspace:${socket.workspaceId}`).emit('workspace:leave', {
-            userId: socket.user.id,
-            timestamp: new Date()
-          });
+          const room = `workspace:${socket.workspaceId}`;
+          // A user may have several tabs/sockets open; only announce them as
+          // offline once their last socket in this room has disconnected.
+          const remaining = await io.in(room).fetchSockets();
+          const stillOnline = remaining.some((s) => s.id !== socket.id && s.user?.id === socket.user.id);
+          if (!stillOnline) {
+            io.to(room).emit('workspace:member-offline', {
+              userId: socket.user.id,
+              timestamp: new Date()
+            });
+          }
         }
       });
     });
