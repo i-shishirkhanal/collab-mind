@@ -32,8 +32,9 @@ def _build_prompt(
 
     context_section = "=== CONTEXT PASSAGES ===\n"
     for i, chunk in enumerate(chunks, start=1):
+        location = f" | Location: {chunk['location_label']}" if chunk.get("location_label") else ""
         context_section += (
-            f"[{i}] Source: {chunk['source_name']} | Chunk: {chunk['chunk_index']}\n"
+            f"[{i}] Source: {chunk['source_name']}{location} | Chunk: {chunk['chunk_index']}\n"
             f"{chunk['content']}\n\n"
         )
 
@@ -56,6 +57,7 @@ def _extract_citations(chunks: list[dict]) -> list[Citation]:
             page_number=chunk.get("page_number"),
             chunk_index=chunk["chunk_index"],
             excerpt=excerpt,
+            location_label=chunk.get("location_label"),
         ))
     return citations
 

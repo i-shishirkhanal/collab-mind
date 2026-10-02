@@ -1,0 +1,55 @@
+# Render Blueprint for CollabMind (free tier where possible).
+# Secrets (sync: false) are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: collabmind-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL        # Supabase "Session pooler" connection string
+        sync: false
+      - key: REDIS_URL           # Render Key Value (free) internal URL, or Upstash
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: AI_SERVICE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY   # backend only, never in the frontend
+        sync: false
+      - key: LIVEKIT_URL                 # wss://<project>.livekit.cloud
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+
+  - type: web
+    name: collabmind-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL         # https://collabmind-backend.onrender.com
+        sync: false
+      - key: NEXT_PUBLIC_WS_URL          # wss://collabmind-backend.onrender.com
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

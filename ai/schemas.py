@@ -45,18 +45,53 @@ class ChatRequest(BaseModel):
     workspace_id: str
     message: str
     conversation_history: list[ChatMessage] = []
+    # Optional: authenticated user (for usage accounting only; authorization is
+    # the backend's job), document-level constraint, and explicit task routing.
+    user_id: Optional[str] = None
+    source_ids: Optional[list[str]] = None
+    task: Optional[Literal["chat", "study", "research"]] = None
 
 
 class Citation(BaseModel):
+    # `index` is the [n] marker used in the answer text. Everything else is
+    # copied from the retrieved chunk, never from model output.
+    index: Optional[int] = None
+    source_id: Optional[str] = None
     source_name: str
     page_number: Optional[int] = None
     chunk_index: int
     excerpt: Optional[str] = None
+    location_label: Optional[str] = None
+    similarity: Optional[float] = None
+
+
+class RouteInfo(BaseModel):
+    provider: str
+    tier: str
+    model_requested: str
+    model_used: str
+    attempts: int
+    fallback_used: bool
+    fallback_reason: Optional[str] = None
+    latency_ms: int
+
+
+class UsageInfo(BaseModel):
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    reasoning_tokens: Optional[int] = None
 
 
 class ChatResponse(BaseModel):
     answer: str
     citations: list[Citation]
+    # grounded | uncited | no_sources | no_answer
+    grounding: str = "grounded"
+    warnings: list[str] = []
+    task: Optional[str] = None
+    route: Optional[RouteInfo] = None  # None when no model was called
+    usage: Optional[UsageInfo] = None
 
 
 # ── Agent endpoints (Study Coach) ─────────────────────────────────────────────
@@ -74,61 +109,4 @@ class StudyCoachResponse(BaseModel):
 class AgentStatusResponse(BaseModel):
     run_id: str
     status: str
-    plan: Optional[str] = None
-    materials: Optional[str] = None
-
-
-# ── Studio endpoints (Content Generation) ─────────────────────────────────────
-
-class FlashcardRequest(BaseModel):
-    workspace_id: str
-    topic: Optional[str] = None
-    count: int = 20
-
-class FlashcardItem(BaseModel):
-    front: str
-    back: str
-    source_ref: str
-
-class FlashcardsResponse(BaseModel):
-    flashcards: list[FlashcardItem]
-
-
-class QuizRequest(BaseModel):
-    workspace_id: str
-    topic: str
-    difficulty: str = "medium"
-    count: int = 10
-
-class QuizQuestion(BaseModel):
-    question: str
-    options: list[str]
-    correct: str
-    explanation: str
-    source_ref: str
-
-class QuizResponse(BaseModel):
-    questions: list[QuizQuestion]
-
-
-class StudyGuideRequest(BaseModel):
-    workspace_id: str
-    topic: str
-
-class StudyGuideSection(BaseModel):
-    heading: str
-    content: str
-    key_terms: list[str]
-
-class StudyGuideResponse(BaseModel):
-    title: str
-    sections: list[StudyGuideSection]
-
-
-class ReportRequest(BaseModel):
-    workspace_id: str
-    title: str
-    outline_points: list[str]
-
-class ReportResponse(BaseModel):
-    report_markdown: str
+    plan: Optional[str] = N

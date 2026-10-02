@@ -34,6 +34,15 @@ async def get_pool() -> asyncpg.Pool:
     return _pool
 
 
+async def ensure_schema(pool: asyncpg.Pool) -> None:
+    """Idempotent column additions so databases created before a feature
+    shipped (migration.sql only runs on first init) pick it up on startup."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS location_label TEXT"
+        )
+
+
 async def close_pool() -> None:
     """
     Gracefully close all connections in the pool.

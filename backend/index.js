@@ -40,6 +40,9 @@ app.use('/api/workspaces', memberRoutes);   // /api/workspaces/:workspaceId/memb
 app.use('/api/workspaces', sourceRoutes);   // /api/workspaces/:workspaceId/sources
 app.use('/api/workspaces', chatRoutes);     // /api/workspaces/:workspaceId/chat
 app.use('/api/workspaces', require('./src/routes/agents')); // /api/workspaces/:workspaceId/agents and /studio
+app.use('/api/conversations', require('./src/routes/conversations')); // 1:1 + group chat, files, calls per conversation
+app.use('/api/calls',         require('./src/routes/calls'));         // call history + LiveKit token/join/leave
+app.use('/api/users',         require('./src/routes/users'));         // people search (shared workspaces only)
 
 // ── 404 handler ────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -58,6 +61,7 @@ app.use((err, _req, res, _next) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;
+require('./src/services/callService').startSweeper(); // expires unanswered / abandoned calls
 server.listen(PORT, () => {
   console.log(`✅  CollabMind backend listening on http://localhost:${PORT}`);
 });

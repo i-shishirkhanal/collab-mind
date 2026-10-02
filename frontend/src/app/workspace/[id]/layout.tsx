@@ -3,7 +3,7 @@
 import { use, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, FileText, MonitorPlay, Users, Loader2, ArrowLeft } from "lucide-react";
+import { MessageSquare, MessagesSquare, FileText, MonitorPlay, Users, Loader2, ArrowLeft } from "lucide-react";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { SocketProvider } from "@/hooks/SocketProvider";
 import { usePresenceStore } from "@/lib/store";
@@ -27,6 +27,7 @@ export default function WorkspaceLayout({
     { name: "Sources", href: `/workspace/${id}/sources`, icon: FileText },
     { name: "Studio", href: `/workspace/${id}/studio`, icon: MonitorPlay },
     { name: "Members", href: `/workspace/${id}/members`, icon: Users },
+    { name: "Messages", href: `/messages`, icon: MessagesSquare },
   ];
 
   if (loading || !workspace) {

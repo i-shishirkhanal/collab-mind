@@ -31,11 +31,11 @@ export function CitationPanel({ citation, onClose }: CitationPanelProps) {
               <p className="text-xs font-medium text-indigo-400 mb-1.5">Document</p>
               <p className="text-sm font-medium text-slate-200 break-words">{citation.source_name}</p>
             </div>
-            {citation.page_number && (
+            {(citation.location_label || citation.page_number) && (
               <div>
-                <p className="text-xs font-medium text-indigo-400 mb-1.5">Page</p>
+                <p className="text-xs font-medium text-indigo-400 mb-1.5">Location</p>
                 <div className="inline-flex items-center justify-center bg-slate-800 border border-slate-700 rounded text-slate-300 text-xs px-2 py-1">
-                  Page {citation.page_number}
+                  {citation.location_label ?? `Page ${citation.page_number}`}
                 </div>
               </div>
             )}

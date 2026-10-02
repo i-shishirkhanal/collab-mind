@@ -46,6 +46,7 @@ CREATE TABLE source_chunks (
     chunk_index INT NOT NULL,
     content TEXT NOT NULL,
     page_number INT,
+    location_label TEXT, -- "Page 3", "Slide 2", "Sheet: Yield", "Section: Methods"
     embedding vector(768) NOT NULL,
     PRIMARY KEY (source_id, chunk_index)
 );

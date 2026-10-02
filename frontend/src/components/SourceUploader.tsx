@@ -11,6 +11,7 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
   const [isDragging, setIsDragging] = useState(false);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const refetchSources = async () => {
@@ -33,11 +34,12 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
 
   const performUpload = async (file: File) => {
     setLoading(true);
+    setError(null);
     try {
       await uploadFile(workspaceId, file);
       refetchSources();
     } catch (err) {
-      console.error("Upload failed", err);
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setLoading(false);
     }
@@ -46,12 +48,13 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
   const handleUrlSubmit = async () => {
     if (!url.trim()) return;
     setLoading(true);
+    setError(null);
     try {
       await addUrl(workspaceId, url);
       setUrl("");
       refetchSources();
     } catch (err) {
-      console.error("URL add failed", err);
+      setError(err instanceof Error ? err.message : "Could not add that link");
     } finally {
       setLoading(false);
     }
@@ -76,7 +79,7 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
           ref={fileInputRef} 
           className="hidden" 
           onChange={handleFileSelect}
-          accept=".pdf,.docx,.txt"
+          accept=".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.csv,.html,.htm,.json"
         />
         <div className="flex flex-col items-center justify-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 mb-2">
@@ -86,7 +89,7 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
             <span className="font-semibold text-indigo-400">Click to upload</span>
             <span className="text-slate-400"> or drag and drop</span>
           </div>
-          <p className="text-xs text-slate-500">PDF, DOCX, or TXT (Max 50MB)</p>
+          <p className="text-xs text-slate-500">PDF, Word, PowerPoint, Excel, CSV, HTML, Markdown or text (max 50 MB)</p>
         </div>
       </div>
 
@@ -111,6 +114,9 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
           {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : "Add URL"}
         </Button>
       </div>
+      {error && (
+        <p role="alert" className="text-sm text-red-400">{error}</p>
+      )}
     </div>
   );
 }

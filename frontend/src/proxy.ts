@@ -27,6 +27,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/workspace/:path*",
+    "/messages/:path*",
     "/auth/signin",
   ],
 };

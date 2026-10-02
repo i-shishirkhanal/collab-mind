@@ -29,6 +29,7 @@ export interface Source {
   name: string;
   type: string;
   status: 'processing' | 'ready' | 'failed';
+  metadata?: { error?: string } | null; // set when status is 'failed'
   uploaded_by: string;
   created_at: string;
 }
@@ -36,6 +37,7 @@ export interface Source {
 export interface Citation {
   source_name: string;
   page_number?: number;
+  location_label?: string; // "Page 3", "Slide 2", "Sheet: Yield", "Section: Methods"
   chunk_index?: number;
   excerpt?: string; // added to help rendering
 }

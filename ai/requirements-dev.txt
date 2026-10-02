@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# Test tooling and the libraries tests use to build small document fixtures
+# (PDF/DOCX/PPTX/XLSX) on the fly, so no binary fixtures are committed.
+pytest>=8.0
+reportlab>=4.0
+python-docx>=1.1

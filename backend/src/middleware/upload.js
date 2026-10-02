@@ -1,39 +1,59 @@
+const path = require('path');
 const multer = require('multer');
 
 // Configure multer to use fully in-memory storage (no direct write to local disk)
 const storage = multer.memoryStorage();
 
-const fileFilter = (req, file, cb) => {
-  // Only accept PDF, DOCX, and TXT files based on MIME type
-  const allowedMimeTypes = [
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain'
-  ];
+// Formats the AI service can extract text from (MarkItDown). Validated by file
+// extension because browsers report inconsistent MIME types for several of
+// these (.md, .csv, .xls) and the MIME type is client-supplied anyway; the
+// upload controller then checks the file's real signature (fileValidation.js)
+// and the AI service checks it again before parsing.
+const ALLOWED_EXTENSIONS = [
+  '.pdf', '.docx', '.pptx', '.xlsx', '.xls',
+  '.txt', '.md', '.csv', '.html', '.htm', '.json',
+];
 
-  if (allowedMimeTypes.includes(file.mimetype)) {
-    // Accept the file
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
+
+const fileFilter = (req, file, cb) => {
+  const extension = path.extname(file.originalname || '').toLowerCase();
+
+  if (ALLOWED_EXTENSIONS.includes(extension)) {
     cb(null, true);
   } else {
-    // Reject the file with a custom error message
-    const error = new Error('Invalid file type. Only PDF, DOCX, and TXT files are allowed.');
+    const error = new Error(
+      `Unsupported file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}.`
+    );
     error.status = 400;
     cb(error, false);
   }
 };
 
-/**
- * Upload middleware instance.
- * - Stores files in memory as Node Buffers.
- * - Enforces a 50MB file size limit.
- * - Enforces allowed file types via fileFilter.
- */
 const upload = multer({
   storage,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50 MB max
+    fileSize: MAX_FILE_BYTES,
+    files: 1,
   },
   fileFilter,
 });
 
-module.exports = upload;
+/** Upload.single('file') with multer's own errors mapped to proper HTTP statuses. */
+const uploadSingle = (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        err.status = 413;
+        err.message = `File is too large (limit ${MAX_FILE_BYTES / 1024 / 1024} MB).`;
+      } else {
+        err.status = 400;
+        err.message = 'Upload one file at a time, in the "file" field.';
+      }
+    }
+    next(err);
+  });
+};
+
+module.exports = { uploadSingle, ALLOWED_EXTENSIONS, MAX_FILE_BYTES };

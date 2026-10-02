@@ -12,9 +12,12 @@ asyncpg>=0.29.0             # Async PostgreSQL driver — much faster than psyco
 google-generativeai>=0.5.0  # Official Google Generative AI SDK (Gemini)
 google-cloud-storage>=2.16.0 # GCS client for downloading source files
 
-# ── Tokenization & PDF Parsing ──────────────────────────────────────────────────
+# ── Tokenization & document extraction ─────────────────────────────────────────
 tiktoken>=0.7.0             # Fast BPE tokenizer — used to count tokens for chunking
-pypdf>=4.0.0                # PDF parser for extracting text from uploaded PDFs
+# Microsoft MarkItDown (MIT) converts PDF / DOCX / PPTX / XLSX / XLS / HTML / CSV
+# etc. to markdown; rag/extractor.py wraps it. Only the extras we use are installed
+# (no audio, Azure or Outlook extras).
+markitdown[pdf,docx,pptx,xlsx,xls]==0.1.8
 
 # ── LangGraph / LangChain (agent framework) ────────────────────────────────────
 langgraph>=0.1.0                       # Graph-based agent runtime

@@ -1,23 +1,4 @@
 services:
-  db:
-    image: ankane/pgvector:latest
-    container_name: collabmind-db
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: collabmind
-      POSTGRES_PASSWORD: collabmind_password
-      POSTGRES_DB: collabmind
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./migration.sql:/docker-entrypoint-initdb.d/1-schema.sql
-      - ./seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U collabmind -d collabmind"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     container_name: collabmind-redis
@@ -39,14 +20,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://collabmind:collabmind_password@db:5432/collabmind
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379
       - GEMINI_API_KEY=${GEMINI_API_KEY:-dummy_gemini_key_for_testing}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -64,7 +43,7 @@ services:
       - "4000:4000"
     environment:
       - PORT=4000
-      - DATABASE_URL=postgresql://collabmind:collabmind_password@db:5432/collabmind
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379
       - AI_SERVICE_URL=http://ai:8000
       - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_123}
@@ -72,8 +51,6 @@ services:
     volumes:
       - uploads_data:/app/uploads
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
       ai:
@@ -101,6 +78,5 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata:
   redisdata:
   uploads_data:

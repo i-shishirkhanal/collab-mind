@@ -9,7 +9,8 @@ import { WorkspaceCard } from "@/components/WorkspaceCard";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
 import { LogoutButton } from "@/components/LogoutButton";
 import { Workspace } from "@/types";
-import { Loader2, LogIn, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { Loader2, LogIn, AlertCircle, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
@@ -56,6 +57,11 @@ export default function Dashboard() {
             <p className="text-slate-400 mt-2 text-sm">Select a workspace to enter CollabMind.</p>
           </div>
           <div className="flex items-center gap-3">
+            {errorType !== "UNAUTHORIZED" && (
+              <Link href="/messages" className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-sm font-medium transition-colors">
+                <MessagesSquare className="w-4 h-4" /> Messages
+              </Link>
+            )}
             {errorType !== "UNAUTHORIZED" && <CreateWorkspaceDialog />}
             <LogoutButton variant="outline" className="border-slate-800 text-slate-300 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20" />
           </div>

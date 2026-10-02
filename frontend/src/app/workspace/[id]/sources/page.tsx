@@ -99,6 +99,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
 
   const getTypeIcon = (type: string) => {
     if (type.includes('pdf')) return <FileText className="w-4 h-4 text-red-400" />;
+    if (['docx', 'pptx', 'xlsx', 'xls', 'csv'].includes(type)) return <FileText className="w-4 h-4 text-indigo-400" />;
     if (type.includes('url')) return <Globe className="w-4 h-4 text-blue-400" />;
     return <FileText className="w-4 h-4 text-slate-400" />;
   };
@@ -145,7 +146,14 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
                             <div className="w-8 h-8 rounded shrink-0 bg-slate-800 flex items-center justify-center border border-slate-700">
                               {getTypeIcon(source.type)}
                             </div>
-                            <span className="truncate max-w-[200px] sm:max-w-xs">{source.name}</span>
+                            <div className="min-w-0">
+                              <span className="block truncate max-w-[200px] sm:max-w-xs">{source.name}</span>
+                              {source.status === 'failed' && source.metadata?.error && (
+                                <span className="block text-xs font-normal text-red-400/90 max-w-[260px] sm:max-w-sm">
+                                  {source.metadata.error}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-slate-400 hidden sm:table-cell capitalize">

@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 import uuid
 
 from redis_client import get_redis, close_redis
-from db import get_pool, close_pool
+from db import get_pool, close_pool, ensure_schema
 from schemas import (
     EmbedRequest, EmbedResponse,
     SummarizeRequest, SummarizeResponse,
@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI):
 
     await get_redis()
     pool = await get_pool()
+    await ensure_schema(pool)
 
     app.state.study_coach = StudyCoachAgent(pool)
 

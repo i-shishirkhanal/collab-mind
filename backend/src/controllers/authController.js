@@ -1,46 +1,54 @@
 const authService = require('../services/authService');
+const { revokeSession } = require('../services/sessionService');
+const { disconnectSession } = require('../services/realtime');
 
-/**
- * googleAuth — POST /auth/google
- * ───────────────────────────────
- * Accepts a Google ID token from the client (obtained after the user completes
- * Google Sign-In), verifies it with Google's servers, then finds or creates a
- * local user record, and returns a signed JWT for subsequent API calls.
- *
- * Request body: { idToken: string }
- * Response:     { token: string, user: { id, email, name, avatar_url } }
- */
-const googleAuth = async (req, res, next) => {
-  try {
-    const { idToken } = req.body;
+const GENERIC_REGISTER = 'If this email can be registered, a verification link has been sent.';
+const GENERIC_RESEND = 'If an unverified account exists for this email, a new verification link has been sent.';
+const GENERIC_FORGOT = 'If an account exists for this email, a password reset link has been sent.';
 
-    if (!idToken) {
-      return res.status(400).json({ error: 'idToken is required' });
-    }
+const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
 
-    // 1. Verify the Google ID token
-    const googlePayload = await authService.verifyGoogleToken(idToken);
+const body = (req) => (req.body && typeof req.body === 'object' ? req.body : {});
 
-    // 2. Find or create the user, and mint a JWT
-    const { token, user } = await authService.findOrCreateUser(googlePayload);
+const register = asyncRoute(async (req, res) => {
+  await authService.register(body(req));
+  res.status(202).json({ message: GENERIC_REGISTER });
+});
 
-    return res.status(200).json({ token, user });
-  } catch (err) {
-    next(err);
-  }
-};
+const verifyEmail = asyncRoute(async (req, res) => {
+  await authService.verifyEmail(body(req).token);
+  res.json({ message: 'Email verified. You can now sign in.' });
+});
 
-const emailAuth = async (req, res, next) => {
-  try {
-    const { email, name } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'email is required' });
-    }
-    const { token, user } = await authService.findOrCreateEmailUser(email, name);
-    return res.status(200).json({ token, user });
-  } catch (err) {
-    next(err);
-  }
-};
+const resendVerification = asyncRoute(async (req, res) => {
+  await authService.resendVerification(body(req).email);
+  res.status(202).json({ message: GENERIC_RESEND });
+});
 
-module.exports = { googleAuth, emailAuth };
+const login = asyncRoute(async (req, res) => {
+  const result = await authService.login(body(req), { userAgent: req.get('user-agent'), ip: req.ip });
+  res.json(result);
+});
+
+const logout = asyncRoute(async (req, res) => {
+  await revokeSession(req.user.sessionId, req.user.id);
+  disconnectSession(req.user.sessionId);
+  res.status(204).end();
+});
+
+const me = asyncRoute(async (req, res) => {
+  const user = await authService.getUserById(req.user.id);
+  res.json({ user });
+});
+
+const forgotPassword = asyncRoute(async (req, res) => {
+  await authService.requestPasswordReset(body(req).email);
+  res.status(202).json({ message: GENERIC_FORGOT });
+});
+
+const resetPassword = asyncRoute(async (req, res) => {
+  await authService.resetPassword(body(req).token, body(req).password);
+  res.json({ message: 'Password updated. Please sign in with your new password.' });
+});
+
+module.exports = { register, verifyEmail, resendVerification, login, logout, me, forgotPassword, resetPassword };

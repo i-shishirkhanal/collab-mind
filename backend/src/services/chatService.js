@@ -1,8 +1,5 @@
-const axios = require('axios');
+const aiClient = require('./aiClient');
 const pool  = require('../db/postgres');
-
-// Base URL of the Python AI service (FastAPI)
-const AI_SERVICE_URL = () => process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 /**
  * getChatMessages
@@ -69,8 +66,8 @@ const sendChatMessage = async (workspaceId, userId, message, conversation_histor
     // 2. Proxy to AI service
     let aiContent, citations;
     try {
-      const aiResponse = await axios.post(
-        `${AI_SERVICE_URL()}/chat`,
+      const aiResponse = await aiClient.post(
+        '/chat',
         { workspace_id: workspaceId, message, conversation_history },
         { timeout: 30_000 },
       );
@@ -78,10 +75,8 @@ const sendChatMessage = async (workspaceId, userId, message, conversation_histor
       citations = aiResponse.data?.citations || [];
     } catch (aiErr) {
       await client.query('ROLLBACK');
-      throw Object.assign(
-        new Error(`AI service error: ${aiErr.message}`),
-        { status: 502 },
-      );
+      console.error(`[Chat] AI service error: ${aiErr.message}`);
+      throw Object.assign(new Error('The AI service is unavailable'), { status: 502 });
     }
 
     // 3. Persist the AI response
