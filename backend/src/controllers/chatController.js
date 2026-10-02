@@ -12,6 +12,9 @@ const getMessages = async (req, res, next) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit, 10) || 50, 100);
     const before = req.query.before || null;
+    if (before !== null && (typeof before !== 'string' || Number.isNaN(Date.parse(before)))) {
+      return res.status(400).json({ error: 'before must be an ISO timestamp' });
+    }
 
     const messages = await chatService.getChatMessages(
       req.params.workspaceId,
@@ -40,11 +43,21 @@ const sendMessage = async (req, res, next) => {
       return res.status(400).json({ error: 'message is required and must be a non-empty string' });
     }
 
+    if (message.length > 4000) {
+      return res.status(400).json({ error: 'message is too long' });
+    }
+
+    // Client-supplied history is untrusted prompt input: keep only well-formed turns.
+    const history = (Array.isArray(conversation_history) ? conversation_history : [])
+      .filter((m) => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
+      .slice(-20)
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+
     const result = await chatService.sendChatMessage(
       req.params.workspaceId,
       req.user.id,
       message.trim(),
-      conversation_history || []
+      history
     );
 
     res.status(201).json(result);

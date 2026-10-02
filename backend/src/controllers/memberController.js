@@ -1,4 +1,5 @@
 const memberService = require('../services/memberService');
+const { removeUserFromWorkspaceRoom } = require('../services/realtime');
 
 /**
  * listMembers — GET /workspaces/:workspaceId/members
@@ -90,6 +91,9 @@ const removeMember = async (req, res, next) => {
     if (!wasRemoved) {
       return res.status(404).json({ error: 'Member not found in this workspace' });
     }
+
+    // Revoke live access too: pull the removed user's sockets out of the room.
+    removeUserFromWorkspaceRoom(workspaceId, userId);
 
     res.status(204).end();
   } catch (err) {

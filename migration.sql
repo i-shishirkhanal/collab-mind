@@ -39,7 +39,7 @@ CREATE TABLE sources (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Note: text-embedding-004 vector dimension is 768.
+-- BGE-M3 dense vectors are 1024-d (must equal EMBEDDING_DIM in the AI service).
 CREATE TABLE source_chunks (
     workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
     source_id UUID REFERENCES sources(id) ON DELETE CASCADE,
@@ -47,7 +47,10 @@ CREATE TABLE source_chunks (
     content TEXT NOT NULL,
     page_number INT,
     location_label TEXT, -- "Page 3", "Slide 2", "Sheet: Yield", "Section: Methods"
-    embedding vector(768) NOT NULL,
+    embedding vector(1024) NOT NULL,
+    embedding_model TEXT,
+    embedding_dim INT,
+    fts tsvector GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED,
     PRIMARY KEY (source_id, chunk_index)
 );
 
@@ -55,6 +58,8 @@ CREATE TABLE source_chunks (
 CREATE INDEX index_source_chunks_on_embedding
 ON source_chunks USING hnsw (embedding vector_cosine_ops)
 WHERE workspace_id IS NOT NULL; -- Partial index helps isolate
+
+CREATE INDEX index_source_chunks_on_fts ON source_chunks USING gin (fts);
 
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -76,3 +81,18 @@ CREATE TABLE agent_runs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Which provider/model served each request, plus token usage when reported.
+CREATE TABLE llm_usage (
+    id BIGSERIAL PRIMARY KEY,
+    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    kind TEXT NOT NULL, task TEXT NOT NULL,
+    provider TEXT NOT NULL, tier TEXT NOT NULL,
+    model_requested TEXT NOT NULL, model_used TEXT NOT NULL,
+    prompt_tokens INT, completion_tokens INT, total_tokens INT, reasoning_tokens INT,
+    latency_ms INT, attempts INT NOT NULL DEFAULT 1,
+    fallback_used BOOLEAN NOT NULL DEFAULT FALSE, fallback_reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX index_llm_usage_workspace ON llm_usage (workspace_id, created_at DESC);

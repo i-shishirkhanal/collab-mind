@@ -22,6 +22,7 @@ from typing import Optional, Sequence
 import asyncpg
 
 from config import RetrievalSettings, get_settings
+from db import assert_vector_schema
 from rag.embedding_provider import get_embedding_client
 
 _COLUMNS = """
@@ -98,6 +99,7 @@ async def retrieve_chunks(
     source_types: Optional[Sequence[str]] = None,
     min_similarity: Optional[float] = None,
 ) -> list[dict]:
+    assert_vector_schema()
     cfg = get_settings().retrieval
     top_k = top_k or cfg.top_k
     query_vector = await get_embedding_client().embed_query(query)  # raises if unavailable

@@ -20,13 +20,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import asyncpg
-import google.generativeai as genai
 
+from db import assert_vector_schema
+from llm.errors import EmbeddingUnavailableError
 from rag.chunker import chunk_blocks
+from rag.embedding_provider import get_embedding_client
 from rag.extractor import Block, ExtractionError, extract_blocks, extract_url
-
-EMBED_MODEL = "models/text-embedding-004"
-EMBED_DIMENSIONS = 768  # must match source_chunks.embedding vector(768)
 
 # Uploaded files may only be read from the shared uploads directory, so a
 # crafted storage_url can't make the service index arbitrary files on disk.
@@ -38,10 +37,6 @@ try:
     from google.cloud import storage as gcs
 except ImportError:
     gcs = None
-
-
-class EmbeddingError(Exception):
-    """Embeddings could not be produced. The message is safe to show users."""
 
 
 def _read_local_file(path_text: str) -> tuple[bytes, str]:
@@ -83,51 +78,11 @@ def load_blocks(storage_url: str) -> list[Block]:
 
 # ── Embeddings ────────────────────────────────────────────────────────────────
 
-def _has_real_embedding_key() -> bool:
-    key = os.environ.get("GEMINI_API_KEY", "")
-    return bool(key) and not key.startswith("dummy")
-
-
-def _dev_embeddings_allowed() -> bool:
-    return os.environ.get("ALLOW_DEV_EMBEDDINGS", "").lower() in ("1", "true", "yes")
-
-
-def embedding_mode() -> str:
-    """'gemini' with a real key; 'dev-hash' only when explicitly opted in
-    (vectors are a hash of the text, NOT semantic); otherwise raises, so a
-    document is never marked ready with embeddings that mean nothing."""
-    if _has_real_embedding_key():
-        return "gemini"
-    if _dev_embeddings_allowed():
-        return "dev-hash"
-    raise EmbeddingError(
-        "No embedding model is configured on the server, so this document can't be indexed yet."
-    )
-
-
-def _embed_text_sync(text: str) -> list[float]:
-    if embedding_mode() == "gemini":
-        try:
-            vector = genai.embed_content(
-                model=EMBED_MODEL, content=text, task_type="RETRIEVAL_DOCUMENT"
-            )["embedding"]
-        except Exception as exc:
-            print(f"[Embedder] Gemini embed call failed: {exc!r}")
-            raise EmbeddingError("The embedding service failed. Please retry.") from exc
-        if len(vector) != EMBED_DIMENSIONS:
-            raise EmbeddingError("The embedding service returned an unexpected vector size.")
-        return vector
-
-    import hashlib
-    h = hashlib.sha256(text.encode("utf-8")).digest()
-    vec = [((h[i % len(h)] / 255.0) * 2.0 - 1.0) for i in range(EMBED_DIMENSIONS)]
-    norm = sum(x * x for x in vec) ** 0.5 or 1.0
-    return [x / norm for x in vec]
-
-
-async def _embed_text(text: str) -> list[float]:
-    # The Gemini SDK call is blocking; keep it off the event loop.
-    return await asyncio.to_thread(_embed_text_sync, text)
+async def _embed_texts(texts: list[str]) -> list[list[float]]:
+    """BGE-M3 vectors for chunk texts. Raises EmbeddingUnavailableError; there
+    is no substitute vector (no hash/fake fallback, not even as an opt-in), so
+    a source is never marked ready with embeddings that mean nothing."""
+    return await get_embedding_client().embed_documents(texts)
 
 
 # ── Status / progress ────────────────────────────────────────────────────────
@@ -206,7 +161,9 @@ async def embed_source(
     Returns the chunk count, or 0 after recording a failure."""
     try:
         await _verify_source(pool, workspace_id, source_id, storage_url)
-        mode = embedding_mode()  # fail before doing any work if embeddings are impossible
+        client = get_embedding_client()
+        assert_vector_schema()
+        client.check_configured()  # fail before doing any work if embeddings are impossible
 
         await _set_stage(pool, workspace_id, source_id, "extracting")
         blocks = await asyncio.wait_for(
@@ -221,7 +178,9 @@ async def embed_source(
 
         # Embed first so a database connection isn't held during slow API calls.
         await _set_stage(pool, workspace_id, source_id, "embedding")
-        vectors = [await _embed_text(chunk.text) for chunk in chunks]
+        vectors = await _embed_texts([chunk.text for chunk in chunks])
+        if len(vectors) != len(chunks):
+            raise EmbeddingUnavailableError("Embedding count did not match chunk count.")
 
         await _set_stage(pool, workspace_id, source_id, "storing")
         summary = {
@@ -229,7 +188,8 @@ async def embed_source(
             "chunk_count": len(chunks),
             "char_count": sum(len(c.text) for c in chunks),
             "page_count": len({c.page_number for c in chunks if c.page_number is not None}) or None,
-            "embedding_mode": mode,
+            "embedding_model": client.model,
+            "embedding_dim": client.dimensions,
             "processed_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -256,9 +216,10 @@ async def embed_source(
                         """
                         INSERT INTO source_chunks
                             (workspace_id, source_id, chunk_index, content,
-                             page_number, location_label, embedding)
+                             page_number, location_label, embedding,
+                             embedding_model, embedding_dim)
                         VALUES
-                            ($1, $2, $3, $4, $5, $6, $7::vector)
+                            ($1, $2, $3, $4, $5, $6, $7::vector, $8, $9)
                         """,
                         workspace_id,
                         source_id,
@@ -266,7 +227,9 @@ async def embed_source(
                         chunk.text,
                         chunk.page_number,
                         chunk.location_label,
-                        str(vector),
+                        "[" + ",".join(repr(x) for x in vector) + "]",
+                        client.model,
+                        client.dimensions,
                     )
 
                 await conn.execute(
@@ -285,9 +248,17 @@ async def embed_source(
         await _publish(workspace_id, "source:ready", source_id, "ready")
         return len(chunks)
 
-    except (ExtractionError, EmbeddingError) as exc:
+    except ExtractionError as exc:
         print(f"[Embedder] Source {source_id} failed: {exc}")
         await _mark_failed(pool, workspace_id, source_id, str(exc))
+        return 0
+    except EmbeddingUnavailableError as exc:
+        # Provider/config problem, not a bad file: say so, and store nothing.
+        print(f"[Embedder] Source {source_id}: embeddings unavailable ({exc.code}): {exc}")
+        await _mark_failed(
+            pool, workspace_id, source_id,
+            "The embedding service is unavailable, so this file could not be indexed. Please retry later.",
+        )
         return 0
     except asyncio.TimeoutError:
         print(f"[Embedder] Source {source_id} timed out after {EXTRACTION_TIMEOUT_SECONDS}s")

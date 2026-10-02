@@ -1,88 +1,101 @@
-import NextAuth from "next-auth"
-import Google from "next-auth/providers/google"
+import NextAuth, { CredentialsSignin } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+
+// Email + password only. The Express backend is the authentication authority:
+// it verifies the password and the email address and issues the session token.
+// There is no offline/demo fallback: if the backend cannot be reached, sign-in fails.
+const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+
+class EmailNotVerified extends CredentialsSignin {
+  code = "email_not_verified"
+}
+class RateLimited extends CredentialsSignin {
+  code = "rate_limited"
+}
+class ServiceUnavailable extends CredentialsSignin {
+  code = "service_unavailable"
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
-    signIn: '/auth/signin',
+    signIn: "/auth/signin",
   },
+  session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60 },
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET || "",
-    }),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        name: { label: "Name", type: "text" }
       },
       async authorize(credentials) {
-        if (!credentials?.email) return null;
-        const email = credentials.email as string;
-        // NextAuth's client form-encodes a JS `undefined` value as the
-        // literal string "undefined", so an absent name must be filtered
-        // here rather than trusted as-is.
-        const rawName = credentials.name as string | undefined;
-        const inputName = rawName && rawName !== "undefined" && rawName.trim() ? rawName.trim() : undefined;
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const email = typeof credentials?.email === "string" ? credentials.email : ""
+        const password = typeof credentials?.password === "string" ? credentials.password : ""
+        if (!email || !password) return null
+
+        let res: Response
         try {
-          const res = await fetch(`${API_URL}/api/auth/email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, name: inputName })
-          });
-          const data = await res.json();
-          if (res.ok && data.user && data.token) {
-            return { id: data.user.id, name: data.user.name, email: data.user.email, accessToken: data.token };
-          }
-        } catch (e) {
-          // Backend is not running – fall back to a local demo user so the UI is still usable
-          console.warn("Backend unreachable, creating local demo session for:", email);
-          const demoId = `demo-${email.replace(/[^a-z0-9]/gi, '-')}`;
-          const name = inputName || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          return { id: demoId, name, email, accessToken: `demo-token-${demoId}` };
+          res = await fetch(`${API_URL}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          })
+        } catch {
+          throw new ServiceUnavailable()
         }
-        return null;
-      }
-    })
+
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data.user && data.token) {
+          return {
+            id: data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            accessToken: data.token,
+            accessTokenExpires: Date.parse(data.expiresAt) || undefined,
+          } as any
+        }
+        if (res.status === 403 && data.code === "EMAIL_NOT_VERIFIED") throw new EmailNotVerified()
+        if (res.status === 429) throw new RateLimited()
+        if (res.status >= 500) throw new ServiceUnavailable()
+        return null
+      },
+    }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id || token.sub;
-        if ((user as any).accessToken) {
-          token.accessToken = (user as any).accessToken;
-        } else if (account?.provider === "google" && account.id_token) {
-          const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-          try {
-            const res = await fetch(`${API_URL}/api/auth/google`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ idToken: account.id_token }),
-            });
-            const data = await res.json();
-            if (data.token) {
-              token.accessToken = data.token;
-            }
-          } catch (e) {
-            console.warn("Backend token exchange for Google user failed:", e);
-          }
-        }
-        if (!token.accessToken) {
-          token.accessToken = `demo-token-${token.id || 'google-user'}`;
-        }
+        token.id = user.id || token.sub
+        token.accessToken = (user as any).accessToken
+        token.accessTokenExpires = (user as any).accessTokenExpires
       }
-      return token;
+      return token
     },
     async session({ session, token }) {
+      const expired =
+        typeof token.accessTokenExpires === "number" && token.accessTokenExpires < Date.now()
       if (session.user) {
-        (session.user as any).id = token.id;
+        ;(session.user as any).id = token.id
       }
-      if (token.accessToken) {
-        (session as any).accessToken = token.accessToken;
+      if (token.accessToken && !expired) {
+        ;(session as any).accessToken = token.accessToken
+      } else {
+        ;(session as any).error = "SessionExpired"
       }
-      return session;
+      return session
+    },
+  },
+  events: {
+    // Revoke the server-side session when the user signs out.
+    async signOut(message) {
+      const accessToken = "token" in message ? (message.token as any)?.accessToken : undefined
+      if (!accessToken) return
+      try {
+        await fetch(`${API_URL}/api/auth/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+      } catch {
+        // Best effort: the session still expires on its own.
+      }
     },
   },
 })

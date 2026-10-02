@@ -58,7 +58,7 @@ class EmbeddingClient:
     def _fail(self, message: str, status: int | None = None) -> errors.EmbeddingUnavailableError:
         return errors.EmbeddingUnavailableError(message, provider=PROVIDER, model=self._s.model, status=status)
 
-    def _check_configured(self) -> None:
+    def check_configured(self) -> None:
         if not self._s.base_url:
             raise errors.EmbeddingUnavailableError(
                 "EMBEDDING_BASE_URL is not configured; BGE-M3 embeddings are unavailable.",
@@ -123,7 +123,7 @@ class EmbeddingClient:
     async def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        self._check_configured()
+        self.check_configured()
         if any(not t or not t.strip() for t in texts):
             raise self._fail("Cannot embed empty text.")
         headers = {"Content-Type": "application/json"}

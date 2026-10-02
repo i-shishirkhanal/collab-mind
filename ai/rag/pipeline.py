@@ -1,65 +1,89 @@
 """
-rag/pipeline.py — Ties retrieval and generation together.
+rag/pipeline.py — Workspace-scoped retrieval-augmented answering.
+
+    retrieve (BGE-M3 + FTS, workspace-filtered, thresholded)
+      -> no relevant chunks?  return NO_SOURCES answer, call NO model
+      -> route task (Flash / Pro) and generate with a grounded prompt
+      -> resolve [n] markers to the real retrieved chunks
 """
 
-import os
-import google.generativeai as genai
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import AsyncIterator, Optional
+
 import asyncpg
 
+from config import get_settings
+from llm import get_router
+from llm.router import classify_task
+from llm.types import Completion, Route, StreamEvent, Task, Usage
+from rag import grounding
+from rag.grounding import NO_ANSWER, Grounded, build_messages, citation_for, select_passages
 from rag.retriever import retrieve_chunks
+from rag.usage import record_usage
 from schemas import Citation
 
-GENERATION_MODEL = "gemini-1.5-flash"
+NO_SOURCES_ANSWER = NO_ANSWER
 
 
-def _build_prompt(
-    query: str,
-    chunks: list[dict],
-    conversation_history: list[dict],
-) -> str:
-    system_instruction = (
-        "You are a helpful study assistant for CollabMind AI.\n"
-        "IMPORTANT: You MUST answer ONLY using the context passages provided below.\n"
-        "If the answer cannot be found in the passages, say exactly:\n"
-        "\"I could not find an answer in your workspace sources.\"\n"
-        "Do NOT use any outside knowledge. Do NOT make up information.\n\n"
-        "CITATIONS: Every factual claim must be followed by the bracketed number(s) of the "
-        "passage(s) it came from, matching the CONTEXT PASSAGES numbering exactly, e.g. "
-        "\"Photosynthesis converts light into energy [1].\" or \"...as shown in two sources [1][3].\" "
-        "Place the citation immediately after the sentence it supports, not at the end of the "
-        "whole answer. Never invent a passage number that isn't listed below.\n\n"
-    )
+@dataclass
+class RagResult:
+    answer: str
+    citations: list[Citation]
+    grounding: str
+    warnings: list[str] = field(default_factory=list)
+    task: Optional[Task] = None
+    route: Optional[Route] = None
+    usage: Optional[Usage] = None
 
-    context_section = "=== CONTEXT PASSAGES ===\n"
-    for i, chunk in enumerate(chunks, start=1):
-        location = f" | Location: {chunk['location_label']}" if chunk.get("location_label") else ""
-        context_section += (
-            f"[{i}] Source: {chunk['source_name']}{location} | Chunk: {chunk['chunk_index']}\n"
-            f"{chunk['content']}\n\n"
-        )
 
-    history_section = "=== CONVERSATION HISTORY ===\n"
-    for turn in conversation_history:
-        role_label = "User" if turn.get("role") == "user" else "Assistant"
-        history_section += f"{role_label}: {turn.get('content', '')}\n"
+@dataclass
+class Prepared:
+    """Retrieval done; either an immediate result (nothing relevant) or the
+    messages to send to the model."""
 
-    question_section = f"\n=== CURRENT QUESTION ===\nUser: {query}\nAssistant:"
-    return system_instruction + context_section + history_section + question_section
+    early: Optional[RagResult] = None
+    messages: Optional[list[dict]] = None
+    passages: Optional[list[dict]] = None
+    task: Optional[Task] = None
 
 
 def _extract_citations(chunks: list[dict]) -> list[Citation]:
-    citations = []
-    for chunk in chunks:
-        content = chunk["content"] or ""
-        excerpt = content[:280] + ("…" if len(content) > 280 else "")
-        citations.append(Citation(
-            source_name=chunk["source_name"],
-            page_number=chunk.get("page_number"),
-            chunk_index=chunk["chunk_index"],
-            excerpt=excerpt,
-            location_label=chunk.get("location_label"),
+    """Citations for a list of chunks, numbered from 1 (kept for callers/tests)."""
+    return [citation_for(i, c) for i, c in enumerate(chunks, start=1)]
+
+
+async def prepare(
+    pool: asyncpg.Pool,
+    workspace_id: str,
+    message: str,
+    conversation_history: list[dict],
+    *,
+    source_ids: Optional[list[str]] = None,
+    task: Optional[Task] = None,
+) -> Prepared:
+    cfg = get_settings()
+    chosen_task = classify_task(message, task, auto_research=cfg.llm.auto_route_research)
+    # Research questions get a wider net than ordinary chat.
+    top_k = cfg.retrieval.top_k * (2 if chosen_task is Task.RESEARCH else 1)
+    chunks = await retrieve_chunks(pool, workspace_id, message, top_k=top_k, source_ids=source_ids)
+    if not chunks:
+        return Prepared(early=RagResult(
+            answer=NO_SOURCES_ANSWER, citations=[], grounding="no_sources", task=chosen_task,
+            warnings=["No sufficiently relevant passages were found in the workspace sources."],
         ))
-    return citations
+    passages = select_passages(chunks, cfg.retrieval.context_max_chars)
+    return Prepared(
+        messages=build_messages(message, passages, conversation_history),
+        passages=passages, task=chosen_task,
+    )
+
+
+def _finish(prep: Prepared, completion_text: str, route: Route, usage: Usage) -> RagResult:
+    g: Grounded = grounding.resolve_citations(completion_text, prep.passages or [])
+    return RagResult(answer=g.answer, citations=g.citations, grounding=g.grounding,
+                     warnings=g.warnings, task=prep.task, route=route, usage=usage)
 
 
 async def run_rag_pipeline(
@@ -67,28 +91,50 @@ async def run_rag_pipeline(
     workspace_id: str,
     message: str,
     conversation_history: list[dict],
-) -> tuple[str, list[Citation]]:
-    chunks = await retrieve_chunks(pool, workspace_id, message)
+    *,
+    source_ids: Optional[list[str]] = None,
+    task: Optional[Task] = None,
+    user_id: Optional[str] = None,
+) -> RagResult:
+    prep = await prepare(pool, workspace_id, message, conversation_history,
+                         source_ids=source_ids, task=task)
+    if prep.early:
+        return prep.early
+    completion: Completion = await get_router().complete(prep.task, prep.messages, temperature=0.1)
+    result = _finish(prep, completion.text, completion.route, completion.usage)
+    await record_usage(pool, workspace_id=workspace_id, user_id=user_id, kind="chat",
+                       task=prep.task.value, route=completion.route, usage=completion.usage)
+    return result
 
-    if not chunks:
-        return (
-            "I could not find an answer in your workspace sources.",
-            [],
-        )
 
-    prompt = _build_prompt(message, chunks, conversation_history)
-    citations = _extract_citations(chunks)
-
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if api_key and not api_key.startswith("dummy"):
-        try:
-            model = genai.GenerativeModel(GENERATION_MODEL)
-            response = model.generate_content(prompt)
-            return response.text, citations
-        except Exception as exc:
-            print(f"[Pipeline] Gemini API error ({exc}). Using context extraction fallback.")
-
-    # Context extraction fallback when API key is missing/invalid
-    excerpt = chunks[0]["content"][:300] if chunks else ""
-    answer = f"Based on your workspace source ({chunks[0]['source_name']}) [1]:\n\n{excerpt}"
-    return answer, citations
+async def stream_rag_pipeline(
+    pool: asyncpg.Pool,
+    workspace_id: str,
+    message: str,
+    conversation_history: list[dict],
+    *,
+    source_ids: Optional[list[str]] = None,
+    task: Optional[Task] = None,
+    user_id: Optional[str] = None,
+) -> AsyncIterator[tuple[str, object]]:
+    """Yields ('delta', text) pieces then one ('result', RagResult). The result
+    carries the authoritative, citation-resolved answer; streamed deltas are a
+    preview and may include markers the final answer strips."""
+    prep = await prepare(pool, workspace_id, message, conversation_history,
+                         source_ids=source_ids, task=task)
+    if prep.early:
+        yield "result", prep.early
+        return
+    parts: list[str] = []
+    done: Optional[StreamEvent] = None
+    async for ev in get_router().stream(prep.task, prep.messages, temperature=0.1):
+        if ev.kind == "delta":
+            parts.append(ev.text)
+            yield "delta", ev.text
+        else:
+            done = ev
+    assert done is not None and done.route is not None
+    usage = done.usage or Usage()
+    await record_usage(pool, workspace_id=workspace_id, user_id=user_id, kind="chat",
+                       task=prep.task.value, route=done.route, usage=usage)
+    yield "result", _finish(prep, "".join(parts), done.route, usage)

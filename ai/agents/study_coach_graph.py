@@ -2,17 +2,28 @@
 agents/study_coach_graph.py — The LangGraph StateGraph definition with fallback support.
 """
 
-import os
 import json
 import asyncio
 from typing import TypedDict, Optional
 
 import asyncpg
-import google.generativeai as genai
 from langgraph.graph import StateGraph, START, END
 
 from redis_client import publish_status, get_redis
+from llm import get_router
+from llm.types import Task
+from rag.generator import NoRelevantSourcesError
 from rag.retriever import retrieve_chunks
+from rag.usage import record_usage
+
+
+async def _ask(state: "StudyCoachState", prompt: str, kind: str) -> str:
+    """One routed model call (ordinary study work -> Flash). Raises a typed
+    provider error on failure; there are no canned fallback texts."""
+    completion = await get_router().complete(Task.STUDY, [{"role": "user", "content": prompt}])
+    await record_usage(state["pool"], workspace_id=state["workspace_id"], user_id=state.get("user_id"),
+                       kind=kind, task=Task.STUDY.value, route=completion.route, usage=completion.usage)
+    return completion.text
 
 
 class StudyCoachState(TypedDict):
@@ -40,30 +51,28 @@ async def analyze_sources(state: StudyCoachState) -> dict:
     })
 
     chunks = await retrieve_chunks(pool, workspace_id, goal, top_k=10)
-    
     if not chunks:
-        topics = ["General Workspace Topics", "Core Architectural Concepts"]
-    else:
-        context = "\n---\n".join(c["content"] for c in chunks)
-        prompt = (
-            f"Extract a comma-separated list of 3-5 core study topics from these passages,\n"
-            f"tailored to the user's goal: '{goal}'.\n\n"
-            f"{context}\n\nTopics (comma separated only):"
+        raise NoRelevantSourcesError(
+            "No indexed workspace content is relevant to this goal. Upload or index sources first."
         )
-        
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        topics = []
-        if api_key and not api_key.startswith("dummy"):
-            try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
-                response = await asyncio.to_thread(model.generate_content, prompt)
-                topics = [t.strip() for t in response.text.split(",") if t.strip()]
-            except Exception as exc:
-                print(f"[Agent Graph] analyze_sources error ({exc}). Using topic fallback.")
-                
-        if not topics:
-            first_words = [c['source_name'] for c in chunks[:3]]
-            topics = [f"Topic: {w}" for w in set(first_words)] or ["Core Concepts", "System Architecture"]
+
+    context = "
+---
+".join(c["content"] for c in chunks)
+    prompt = (
+        f"Extract a comma-separated list of 3-5 core study topics from these passages,
+"
+        f"tailored to the user's goal: '{goal}'.
+
+"
+        f"{context}
+
+Topics (comma separated only):"
+    )
+    text = await _ask(state, prompt, "agent_topics")
+    topics = [t.strip() for t in text.split(",") if t.strip()]
+    if not topics:
+        raise ValueError("The model returned no topics.")
 
     return {"topics": topics, "status": "analyzing"}
 
@@ -86,25 +95,8 @@ async def create_plan(state: StudyCoachState) -> dict:
         f"Keep it concise and actionable."
     )
     
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    plan_text = ""
-    if api_key and not api_key.startswith("dummy"):
-        try:
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            response = await asyncio.to_thread(model.generate_content, prompt)
-            plan_text = response.text
-        except Exception as exc:
-            print(f"[Agent Graph] create_plan error ({exc}). Using plan fallback.")
+    plan_text = await _ask(state, prompt, "agent_plan")
 
-    if not plan_text:
-        plan_text = (
-            f"# Customized Study Plan for '{goal}'\n\n"
-            f"**Target Topics:** {topics_list}\n\n"
-            f"- **Day 1:** Review foundational principles of {topics_list}.\n"
-            f"- **Day 2:** Analyze architecture diagrams and component interactions.\n"
-            f"- **Day 3:** Practice problem-solving and review flashcards."
-        )
-    
     return {"plan": plan_text, "status": "planning"}
 
 
@@ -166,23 +158,7 @@ async def generate_materials(state: StudyCoachState) -> dict:
         f"Include: 10 flashcards (Q&A), 5 multiple-choice quiz questions, and a list of key concepts."
     )
     
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    materials_text = ""
-    if api_key and not api_key.startswith("dummy"):
-        try:
-            model = genai.GenerativeModel("gemini-1.5-pro")
-            response = await asyncio.to_thread(model.generate_content, prompt)
-            materials_text = response.text
-        except Exception as exc:
-            print(f"[Agent Graph] generate_materials error ({exc}). Using materials fallback.")
-
-    if not materials_text:
-        materials_text = (
-            "### Study Materials Package\n\n"
-            "1. **Flashcards (10):** Generated covering core workspace topics.\n"
-            "2. **Practice Quiz (5 Questions):** Multiple choice items ready.\n"
-            "3. **Summary Sheet:** Comprehensive notes synthesized from sources."
-        )
+    materials_text = await _ask(state, prompt, "agent_materials")
 
     return {"materials": materials_text, "status": "generating"}
 

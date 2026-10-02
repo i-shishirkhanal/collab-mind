@@ -8,9 +8,8 @@ uvicorn[standard]>=0.29.0   # ASGI server that runs FastAPI (like Node's Express
 # ── Database ───────────────────────────────────────────────────────────────────
 asyncpg>=0.29.0             # Async PostgreSQL driver — much faster than psycopg2 for async code
 
-# ── Google AI ─────────────────────────────────────────────────────────────────
-google-generativeai>=0.5.0  # Official Google Generative AI SDK (Gemini)
-google-cloud-storage>=2.16.0 # GCS client for downloading source files
+# ── Storage ───────────────────────────────────────────────────────────────────
+google-cloud-storage>=2.16.0 # GCS client for downloading source files (storage only; no Gemini)
 
 # ── Tokenization & document extraction ─────────────────────────────────────────
 tiktoken>=0.7.0             # Fast BPE tokenizer — used to count tokens for chunking
@@ -22,9 +21,9 @@ markitdown[pdf,docx,pptx,xlsx,xls]==0.1.8
 # ── LangGraph / LangChain (agent framework) ────────────────────────────────────
 langgraph>=0.1.0                       # Graph-based agent runtime
 langchain>=0.2.0                       # Core LangChain abstractions
-langchain-google-genai>=1.0.0          # LangChain ↔ Gemini integration
+langchain-openai>=0.2.0                # LangChain ↔ DeepSeek (OpenAI-compatible API) for the ReAct agent
 
 # ── Utilities ──────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0        # Loads .env file into os.environ automatically
 redis[asyncio]>=5.0.0       # Async pub/sub and KV store for agent statuses
-httpx>=0.27.0                # HTTP client used to fetch web-page/URL sources
+httpx>=0.27.0                # HTTP client: DeepSeek chat, BGE-M3 embeddings, URL sources

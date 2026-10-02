@@ -146,4 +146,10 @@ const deleteSource = async (workspaceId, sourceId) => {
 module.exports = {
   getWorkspaceSources,
   getSource,
-  findDuplicateByHas
+  findDuplicateByHash,
+  createSourceRecord,
+  markSourceFailed,
+  triggerAiEmbedding,
+  beginRetry,
+  deleteSource,
+};

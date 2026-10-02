@@ -97,8 +97,8 @@ Environment **[VERIFIED]**: Windows 11, Node v24.19.0, npm 11.17.0, Python 3.14.
 |---|---|
 | Backend `node --test --test-force-exit test/messaging.test.js` | **No result** — killed at the cap (exit 124, 470 s, zero output). Same stall as §3.1. |
 | `ai`: `python -m pytest -q` | **Ran, collection failed (exit ≠ 0)** — both test modules error with `ModuleNotFoundError: No module named 'markitdown'`. The interpreter used was Anaconda Python 3.14 (`C:\Users\meshi\anaconda3`), **not** `ai/.venv`, so this shows the *global* environment lacks the new dependency; it does not show the tests fail in the project venv. Re-run with `ai/.venv` (or after `pip install -r requirements-dev.txt`). No tests executed. |
-| Frontend `npx tsc --noEmit` | **Not finished when this document was written** (job still running, capped at 420 s). Treat as no result. Expected to report the missing `livekit-client` module (D-04, **[INSPECTED]**). |
-| Frontend `npx eslint .` | **Not run in the re-run** (queued behind tsc); the first attempt timed out (exit 124). No result. |
+| Frontend `npx tsc --noEmit` | **No result** — hit the 420 s cap again (exit 124, no output). It is expected to report the missing `livekit-client` module (D-04, **[INSPECTED]**), but that is unconfirmed. |
+| Frontend `npx eslint .` | **No result** — hit the cap again (exit 124, no output). |
 
 Net: **no test, lint, or type-check has been verified as passing.** The only verified pass is `docker compose config -q`.
 

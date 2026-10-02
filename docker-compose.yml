@@ -2,10 +2,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: collabmind-redis
+    # Password required; published to the host loopback only.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
+    environment:
+      - REDISCLI_AUTH=${REDIS_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
       interval: 5s
@@ -17,12 +21,25 @@ services:
       context: ./ai
       dockerfile: Dockerfile
     container_name: collabmind-ai
+    # Reachable by the backend over the compose network; the host port is
+    # loopback-only (local debugging). Every route but /health also requires AI_SERVICE_TOKEN.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-dummy_gemini_key_for_testing}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required}
+      # Chat/study/research models (server-side only). See ai/.env.example for all knobs.
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - LLM_MODEL_FLASH=${LLM_MODEL_FLASH:-deepseek-flash}
+      - LLM_MODEL_PRO=${LLM_MODEL_PRO:-deepseek-v4-pro}
+      - LLM_FALLBACK_PRO_TO_FLASH=${LLM_FALLBACK_PRO_TO_FLASH:-false}
+      # BGE-M3 embeddings: point at the bundled `embeddings` service (profile) or a hosted endpoint.
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
+      - RETRIEVAL_MIN_SIMILARITY=${RETRIEVAL_MIN_SIMILARITY:-0.35}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -34,6 +51,20 @@ services:
       timeout: 5s
       retries: 5
 
+  # Optional self-hosted BGE-M3 (HuggingFace text-embeddings-inference, CPU build).
+  #   docker compose --profile embeddings up -d embeddings
+  # then set EMBEDDING_BASE_URL=http://embeddings:80/v1. First start downloads ~2.3 GB of weights.
+  # Use a `cuda-*` TEI image plus a GPU reservation for GPU inference. See docs/AI_PHASE3.md.
+  embeddings:
+    profiles: ["embeddings"]
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
+    container_name: collabmind-embeddings
+    command: ["--model-id", "BAAI/bge-m3"]
+    volumes:
+      - embedding_models:/data
+    expose:
+      - "80"
+
   backend:
     build:
       context: ./backend
@@ -43,11 +74,18 @@ services:
       - "4000:4000"
     environment:
       - PORT=4000
+      - NODE_ENV=${NODE_ENV:-development}
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RATE_LIMIT_STORE=redis
       - AI_SERVICE_URL=http://ai:8000
-      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_123}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-your_google_client_id.apps.googleusercontent.com}
+      - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+      - SMTP_URL=${SMTP_URL:-}
+      - MAIL_FROM=${MAIL_FROM:-}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -72,7 +110,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:4000
       - NEXT_PUBLIC_WS_URL=ws://localhost:4000
       - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-super_secret_nextauth_key_123}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
     depends_on:
       backend:
         condition: service_healthy
@@ -80,3 +118,4 @@ services:
 volumes:
   redisdata:
   uploads_data:
+  embedding_models:

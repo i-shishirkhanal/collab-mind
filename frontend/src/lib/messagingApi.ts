@@ -1,4 +1,5 @@
 import { apiCall } from "@/lib/api";
+import { getAccessToken, handleUnauthorized } from "@/lib/authToken";
 import type {
   Call, CallCredentials, CallHistoryItem, ChatUser, Conversation, DirectMessage, ReadState,
 } from "@/types/messaging";
@@ -56,8 +57,11 @@ export const getAttachmentUrl = (id: string, messageId: string): Promise<{ url: 
 
 /** Multipart upload; `apiCall` forces a JSON content type so this mirrors uploadSourceFile in api.ts. */
 export async function sendAttachment(id: string, file: File, caption = ""): Promise<DirectMessage> {
-  const token =
-    (typeof window !== "undefined" && localStorage.getItem("supabase_auth_token")) || "demo-guest-token";
+  const token = await getAccessToken();
+  if (!token) {
+    handleUnauthorized();
+    throw new Error("UNAUTHORIZED");
+  }
   const form = new FormData();
   form.append("file", file);
   if (caption) form.append("body", caption);
@@ -72,7 +76,10 @@ export async function sendAttachment(id: string, file: File, caption = ""): Prom
   } catch {
     throw new Error("CONNECTION_FAILED");
   }
-  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error("UNAUTHORIZED");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Failed to upload file");
   return data;

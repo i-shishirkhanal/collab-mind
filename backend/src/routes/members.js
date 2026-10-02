@@ -3,9 +3,13 @@ const memberController       = require('../controllers/memberController');
 const authenticate           = require('../middleware/authenticate');
 const requireWorkspaceMember = require('../middleware/requireWorkspaceMember');
 const requireRole            = require('../middleware/requireRole');
+const { isUuid }             = require('../utils/http');
 
 // mergeParams lets us access :workspaceId defined in the parent router (index.js)
 const router = express.Router({ mergeParams: true });
+
+router.param('userId', (req, res, next, value) =>
+  isUuid(value) ? next() : res.status(400).json({ error: 'Invalid userId' }));
 
 /**
  * GET /workspaces/:workspaceId/members

@@ -10,14 +10,6 @@ const pool = require('../db/postgres');
  * @returns {Promise<Array>}
  */
 const getUserWorkspaces = async (userId) => {
-  // Ensure user exists in users table before querying
-  await pool.query(
-    `INSERT INTO users (id, name, email, created_at)
-          VALUES ($1, 'Demo Researcher', 'demo@collabmind.ai', NOW())
-     ON CONFLICT (id) DO NOTHING`,
-    [userId],
-  );
-
   const { rows } = await pool.query(
     `SELECT w.id, w.name, w.description, w.avatar_url, w.created_at,
             wm.role, wm.joined_at
@@ -44,14 +36,6 @@ const createWorkspace = async (userId, { name, description = null, avatar_url = 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    // Ensure the user exists in users table before creating workspace to avoid FK constraint error
-    await client.query(
-      `INSERT INTO users (id, name, email, created_at)
-            VALUES ($1, 'Demo Researcher', 'demo@collabmind.ai', NOW())
-       ON CONFLICT (id) DO NOTHING`,
-      [userId],
-    );
 
     const workspaceId = uuidv4();
 

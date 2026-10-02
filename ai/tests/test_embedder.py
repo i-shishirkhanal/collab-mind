@@ -58,14 +58,21 @@ class FakePool:
 
 @pytest.fixture(autouse=True)
 def isolate(monkeypatch, tmp_path):
-    async def fake_embed(text):
-        return [0.0] * 768
+    class FakeEmbeddingClient:
+        model = "bge-m3-test"
+        dimensions = 1024
+
+        def check_configured(self):
+            pass
+
+    async def fake_embed(texts):
+        return [[0.0] * 1024 for _ in texts]
 
     async def no_publish(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(embedder, "_embed_text", fake_embed)
-    monkeypatch.setattr(embedder, "embedding_mode", lambda: "gemini")
+    monkeypatch.setattr(embedder, "_embed_texts", fake_embed)
+    monkeypatch.setattr(embedder, "get_embedding_client", lambda: FakeEmbeddingClient())
     monkeypatch.setattr(embedder, "_publish", no_publish)
     monkeypatch.setattr(embedder, "UPLOADS_DIR", tmp_path.resolve())
 

@@ -6,7 +6,9 @@ import { SourceUploader } from "@/components/SourceUploader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Database, Trash2, Globe, Sparkles, Loader2, X, Copy, Check } from "lucide-react";
-import { getSources, summarizeSource } from "@/lib/api";
+import { getSources, summarizeSource, retrySource, deleteSource } from "@/lib/api";
+import { STAGE_LABELS } from "@/lib/sourceFiles";
+import { RotateCw } from "lucide-react";
 
 export default function SourcesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -80,6 +82,41 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
     }
   };
 
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const refreshSources = async () => {
+    const sData = await getSources(id);
+    setSources(Array.isArray(sData) ? sData : (sData?.sources || []));
+  };
+
+  const handleRetry = async (sourceId: string) => {
+    setBusyId(sourceId);
+    setActionError(null);
+    try {
+      await retrySource(id, sourceId);
+      await refreshSources();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not retry this source.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (sourceId: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"? Its indexed content will be removed from this workspace.`)) return;
+    setBusyId(sourceId);
+    setActionError(null);
+    try {
+      await deleteSource(id, sourceId);
+      await refreshSources();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not delete this source.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const copyToClipboard = () => {
     if (!activeSummary) return;
     const text = `Document: ${activeSummary.source_name}\n\nSummary:\n${activeSummary.summary}\n\nKey Takeaways:\n${activeSummary.key_takeaways.map(t => `- ${t}`).join('\n')}`;
@@ -88,9 +125,9 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, stage?: string) => {
     switch (status) {
-      case 'processing': return <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 capitalize flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>Processing</Badge>;
+      case 'processing': return <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>{(stage && STAGE_LABELS[stage]) || 'Processing'}</Badge>;
       case 'ready': return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 capitalize">Ready</Badge>;
       case 'failed': return <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20 capitalize">Failed</Badge>;
       default: return <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 capitalize">{status}</Badge>;
@@ -119,7 +156,8 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
 
         <div>
           <h3 className="text-lg font-medium text-slate-200 mb-4">Indexed Sources</h3>
-          
+          {actionError && <p role="alert" className="text-sm text-red-400 mb-3">{actionError}</p>}
+
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
             {sources.length === 0 ? (
               <div className="text-center py-10 text-slate-500">
@@ -160,7 +198,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
                           {source.type.split('/')[1] || source.type}
                         </td>
                         <td className="px-6 py-4">
-                          {getStatusBadge(source.status)}
+                          {getStatusBadge(source.status, source.metadata?.stage)}
                         </td>
                         <td className="px-6 py-4 text-slate-500 hidden md:table-cell">
                           {source.created_at ? new Date(source.created_at).toLocaleDateString() : 'Recently'}
@@ -180,6 +218,28 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
                                 <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                               )}
                               Summarize
+                            </Button>
+                            {source.status === 'failed' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busyId === source.id}
+                                onClick={() => handleRetry(source.id)}
+                                className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs"
+                              >
+                                {busyId === source.id ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RotateCw className="w-3.5 h-3.5 mr-1.5" />}
+                                Retry
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              aria-label={`Delete ${source.name}`}
+                              disabled={busyId === source.id}
+                              onClick={() => handleDelete(source.id, source.name)}
+                              className="text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </td>

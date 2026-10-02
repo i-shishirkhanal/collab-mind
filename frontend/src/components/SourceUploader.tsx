@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadFile, addUrl } from "@/lib/api";
 import { useWorkspaceStore } from "@/lib/store";
+import { ALLOWED_EXTENSIONS, describeUploadError, validateSourceFile } from "@/lib/sourceFiles";
 
 export function SourceUploader({ workspaceId }: { workspaceId: string }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -24,25 +25,35 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
     e.preventDefault();
     setIsDragging(false);
     if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
-    performUpload(e.dataTransfer.files[0]);
+    performUpload(Array.from(e.dataTransfer.files));
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    performUpload(e.target.files[0]);
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = ""; // let the same file be chosen again after a failure
+    if (files.length === 0) return;
+    performUpload(files);
   };
 
-  const performUpload = async (file: File) => {
+  const performUpload = async (files: File[]) => {
     setLoading(true);
     setError(null);
-    try {
-      await uploadFile(workspaceId, file);
-      refetchSources();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setLoading(false);
+    const problems: string[] = [];
+    for (const file of files) {
+      const invalid = validateSourceFile(file);
+      if (invalid) {
+        problems.push(invalid);
+        continue;
+      }
+      try {
+        await uploadFile(workspaceId, file);
+        refetchSources();
+      } catch (err) {
+        problems.push(`${file.name}: ${describeUploadError(err, "Upload failed")}`);
+      }
     }
+    setError(problems.length ? problems.join("\n") : null);
+    setLoading(false);
   };
 
   const handleUrlSubmit = async () => {
@@ -54,7 +65,7 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
       setUrl("");
       refetchSources();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add that link");
+      setError(describeUploadError(err, "Could not add that link"));
     } finally {
       setLoading(false);
     }
@@ -79,7 +90,8 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
           ref={fileInputRef} 
           className="hidden" 
           onChange={handleFileSelect}
-          accept=".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.csv,.html,.htm,.json"
+          multiple
+          accept={ALLOWED_EXTENSIONS.join(",")}
         />
         <div className="flex flex-col items-center justify-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 mb-2">
@@ -115,7 +127,7 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
         </Button>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-red-400">{error}</p>
+        <p role="alert" className="text-sm text-red-400 whitespace-pre-line">{error}</p>
       )}
     </div>
   );

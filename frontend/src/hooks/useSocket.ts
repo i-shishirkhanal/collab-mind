@@ -22,7 +22,9 @@ export const useSocket = (workspaceId?: string) => {
     if (typeof window === "undefined" || !workspaceId) return;
 
     const userId = (session as any)?.user?.id;
-    const token = (session as any)?.accessToken || userId || 'demo-guest-token';
+    // Only a real session token connects; there is no guest/demo fallback.
+    const token = (session as any)?.accessToken;
+    if (!token) return;
 
     const socket = io(WS_URL, {
       path: '/socket.io',
@@ -40,6 +42,10 @@ export const useSocket = (workspaceId?: string) => {
 
     socket.on('connect_error', (err) => {
       console.warn('Socket connection status:', err.message);
+    });
+
+    socket.on('error', (err: { message?: string; code?: string }) => {
+      console.warn('Socket error:', err?.message ?? err);
     });
 
     socket.on('workspace:joined', () => {

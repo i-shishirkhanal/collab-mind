@@ -1,12 +1,18 @@
 // Base API Call Wrapper
+import { getAccessToken, handleUnauthorized } from '@/lib/authToken';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('supabase_auth_token') || 'demo-guest-token' : 'demo-guest-token';
-  
+  const token = await getAccessToken();
+  if (!token) {
+    handleUnauthorized();
+    throw new Error('UNAUTHORIZED');
+  }
+
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    'Authorization': `Bearer ${token}`,
     ...options.headers,
   };
 
@@ -21,6 +27,7 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
   }
 
   if (response.status === 401) {
+    handleUnauthorized();
     throw new Error('UNAUTHORIZED');
   }
 
@@ -58,7 +65,11 @@ export const getSources = (workspaceId: string, type?: string) =>
   apiCall(`/api/workspaces/${workspaceId}/sources${type ? `?type=${type}` : ''}`);
 
 export const uploadSourceFile = async (workspaceId: string, file: File) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('supabase_auth_token') || 'demo-guest-token' : 'demo-guest-token';
+  const token = await getAccessToken();
+  if (!token) {
+    handleUnauthorized();
+    throw new Error('UNAUTHORIZED');
+  }
   const formData = new FormData();
   formData.append('file', file);
 
@@ -76,6 +87,7 @@ export const uploadSourceFile = async (workspaceId: string, file: File) => {
   }
 
   if (response.status === 401) {
+    handleUnauthorized();
     throw new Error('UNAUTHORIZED');
   }
 
@@ -106,7 +118,13 @@ export const addUrlSource = (workspaceId: string, url: string) =>
 
 export const addUrl = addUrlSource;
 
-export const summarizeSource = (workspaceId: string, sourceId: string) => 
+export const retrySource = (workspaceId: string, sourceId: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/sources/${sourceId}/retry`, { method: 'POST' });
+
+export const deleteSource = (workspaceId: string, sourceId: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/sources/${sourceId}`, { method: 'DELETE' });
+
+export const summarizeSource = (workspaceId: string, sourceId: string) =>
   apiCall(`/api/workspaces/${workspaceId}/sources/${sourceId}/summarize`, { method: 'POST' });
 
 // Members API

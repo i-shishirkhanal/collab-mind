@@ -24,13 +24,24 @@ export interface WorkspaceMember {
   online?: boolean;
 }
 
+/** Processing progress/result written by the backend and AI service. */
+export interface SourceMetadata {
+  error?: string; // set when status is 'failed'; safe to show to users
+  stage?: 'queued' | 'extracting' | 'chunking' | 'embedding' | 'storing' | 'ready' | 'failed';
+  attempts?: number;
+  chunk_count?: number;
+  page_count?: number | null;
+  size_bytes?: number;
+}
+
 export interface Source {
   id: string;
   name: string;
   type: string;
   status: 'processing' | 'ready' | 'failed';
-  metadata?: { error?: string } | null; // set when status is 'failed'
-  uploaded_by: string;
+  metadata?: SourceMetadata | null;
+  created_by?: string;
+  uploaded_by?: string;
   created_at: string;
 }
 

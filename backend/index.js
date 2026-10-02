@@ -1,4 +1,14 @@
 require('dotenv').config();
+
+// Fail fast on missing/weak secrets or bad security config (no insecure fallbacks).
+const config = require('./src/config/env');
+try {
+  config.validateConfig();
+} catch (err) {
+  console.error(`❌  Invalid configuration: ${err.message}`);
+  process.exit(1);
+}
+
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
@@ -24,11 +34,13 @@ initPubSub(io);
 require('./src/services/agentSubscriber').initAgentSubscriber(io);
 
 // ── Global middleware ──────────────────────────────────────────────────────────
+// Only trust X-Forwarded-For when explicitly behind a proxy (rate limits key on req.ip).
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 app.use(helmet());                          // Secure HTTP headers
-app.use(cors());                            // Enable CORS for all origins
+app.use(cors({ origin: config.corsOrigins() })); // Explicit origin allow-list (CORS_ORIGINS)
 app.use(morgan('dev'));                      // Request logging
-app.use(express.json());                    // Parse JSON bodies
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '100kb' }));  // Parse JSON bodies
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // ── Health check ───────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
@@ -45,19 +57,14 @@ app.use('/api/calls',         require('./src/routes/calls'));         // call hi
 app.use('/api/users',         require('./src/routes/users'));         // people search (shared workspaces only)
 
 // ── 404 handler ────────────────────────────────────────────────────────────────
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+const { notFound, errorHandler } = require('./src/middleware/errorHandler');
+app.use(notFound);
 
-// ── Global error handler ───────────────────────────────────────────────────────
-// Must have 4 params so Express recognises it as an error handler
-// eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
-  console.error('[ERROR]', err);
-  const status  = err.status || err.statusCode || 500;
-  const message = err.message || 'Internal server error';
-  res.status(status).json({ error: message });
-});
+// ── Global error handler (never leaks 5xx internals) ───────────────────────────
+app.use(errorHandler);
+
+// Expired sessions / tokens are purged hourly.
+setInterval(() => require('./src/services/sessionService').purgeExpired().catch((e) => console.error('[Auth] purge failed:', e.message)), 60 * 60 * 1000).unref();
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;

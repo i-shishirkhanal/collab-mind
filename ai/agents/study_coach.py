@@ -48,7 +48,7 @@ def make_study_coach_tools(pool: asyncpg.Pool) -> list:
     @tool
     async def generate_quiz(topic: str, workspace_id: str) -> str:
         """
-        Retrieve content about `topic` and ask Gemini (via the agent's own LLM)
+        Retrieve content about `topic` and ask the agent's own LLM
         to produce a 5-question multiple-choice quiz based ONLY on that content.
 
         The agent will call this tool, read the returned passages, and then

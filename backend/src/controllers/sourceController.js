@@ -98,6 +98,7 @@ const addUrlSource = async (req, res, next) => {
     if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url) || url.length > 2048) {
       return res.status(400).json({ error: 'A valid http(s) URL is required' });
     }
+    await assertPublicHttpUrl(url); // blocks internal/metadata addresses (SSRF)
 
     const isYoutube = url.includes('youtube.com') || url.includes('youtu.be');
     const type = isYoutube ? 'youtube' : 'url';
@@ -189,4 +190,9 @@ const summarizeSource = async (req, res, next) => {
     });
     res.json(response.data);
   } catch (err) {
-    if (err.respon
+    if (err.response) return res.status(err.response.status >= 500 ? 502 : err.response.status).json({ error: 'The AI service could not complete the request' });
+    next(err);
+  }
+};
+
+module.exports = { listSources, getSource, uploadFile, addUrlSource, retrySource, deleteSource, summarizeSource };

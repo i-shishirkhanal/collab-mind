@@ -1,4 +1,4 @@
-const { test, beforeEach } = require('node:test');
+﻿const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const jwt = require('jsonwebtoken');
@@ -15,11 +15,9 @@ const poolPath = require.resolve(path.join(__dirname, '../src/db/postgres'));
 require.cache[poolPath] = { id: poolPath, filename: poolPath, loaded: true, exports: poolStub };
 
 const livekit = require('../src/services/livekitService');
-const { demoAuthAllowed, isDemoToken } = require('../src/config/demoAuth');
 const { isUuid, escapeLike, requireUuidParams } = require('../src/utils/http');
 const { directKey, assertMember } = require('../src/services/conversationService');
 const { isAllowedFileType } = require('../src/services/messageService');
-const authenticate = require('../src/middleware/authenticate');
 
 beforeEach(() => {
   calls.length = 0;
@@ -61,36 +59,7 @@ test('LiveKit credentials are refused with 503 when not configured', () => {
   });
 });
 
-// ── Demo auth gate ────────────────────────────────────────────────────────────
-test('demo tokens are recognised but disabled in production unless explicitly allowed', () => {
-  assert.equal(isDemoToken('demo-guest-token'), true);
-  assert.equal(isDemoToken('test-token'), true);
-  assert.equal(isDemoToken('eyJhbGciOi.real.jwt'), false);
-  withEnv({ NODE_ENV: 'production', ALLOW_DEMO_AUTH: undefined }, () => assert.equal(demoAuthAllowed(), false));
-  withEnv({ NODE_ENV: 'production', ALLOW_DEMO_AUTH: 'true' }, () => assert.equal(demoAuthAllowed(), true));
-  withEnv({ NODE_ENV: 'development', ALLOW_DEMO_AUTH: undefined }, () => assert.equal(demoAuthAllowed(), true));
-});
-
-test('authenticate rejects a demo token in production (cannot impersonate the demo user)', () => {
-  withEnv({ NODE_ENV: 'production', ALLOW_DEMO_AUTH: undefined, JWT_SECRET: 's' }, () => {
-    let status; let nextCalled = false;
-    const res = { status(c) { status = c; return this; }, json() {} };
-    authenticate({ headers: { authorization: 'Bearer demo-anything' } }, res, () => { nextCalled = true; });
-    assert.equal(status, 401);
-    assert.equal(nextCalled, false);
-  });
-});
-
-test('authenticate still accepts a real signed JWT in production', () => {
-  withEnv({ NODE_ENV: 'production', JWT_SECRET: 's3cret' }, () => {
-    const token = jwt.sign({ id: 'u-1', email: 'a@b.c', name: 'A' }, 's3cret');
-    const req = { headers: { authorization: `Bearer ${token}` } };
-    let nextCalled = false;
-    authenticate(req, { status() { return this; }, json() {} }, () => { nextCalled = true; });
-    assert.equal(nextCalled, true);
-    assert.equal(req.user.id, 'u-1');
-  });
-});
+// Authentication (demo-token removal, session verification) is covered in auth.test.js.
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 test('directKey is order-independent so a pair has exactly one direct thread', () => {
