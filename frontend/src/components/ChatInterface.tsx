@@ -11,8 +11,10 @@ import { useSocketContext } from "@/hooks/SocketProvider";
 
 export function ChatInterface({ workspaceId }: { workspaceId: string }) {
   const [input, setInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const messages = useChatStore(s => s.messages);
   const addMessage = useChatStore(s => s.addMessage);
+  const replaceMessage = useChatStore(s => s.replaceMessage);
   const setMessages = useChatStore(s => s.setMessages);
   const isLoading = useChatStore(s => s.isLoading);
   const setLoading = useChatStore(s => s.setLoading);
@@ -25,6 +27,7 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
   // Socket is initialized by the workspace layout's SocketProvider; reuse it here
   const { sendTyping } = useSocketContext();
   const typingStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSent = useRef(0);
 
   // Fetch initial history
   useEffect(() => {
@@ -62,6 +65,7 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
 
     addMessage(userMsg);
     setInput("");
+    setError(null);
     setLoading(true);
     sendTyping(false);
     if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
@@ -71,12 +75,22 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
     }
 
     try {
-      // Send chat via REST API to backend. Backend pushes 'chat:message' socket event on response.
-      // So we don't manually add the AI response here, we just await the API to complete to unset loading.
-      await sendChat(workspaceId, userMsg.content, messages);
+      // The answer also arrives as a 'chat:message' socket event, but that only reaches us if the
+      // socket has already joined the workspace room. The REST response is authoritative, so use it
+      // too; messages are merged by id, so receiving both is harmless.
+      // History is read from the server-side conversation; nothing is sent from here.
+      const result = await sendChat(workspaceId, userMsg.content);
+      if (result?.userMessage) replaceMessage(userMsg.id, result.userMessage);
+      if (result?.aiMessage) addMessage(result.aiMessage);
     } catch (err) {
       console.error(err);
-      // Fallback local error message if needed
+      // The backend does not keep a question whose answer failed, so tell the user to resend it.
+      const code = err instanceof Error ? err.message : "";
+      setError(
+        code === "CONNECTION_FAILED" ? "Could not reach the server. Check your connection and try again."
+        : code && code !== "UNAUTHORIZED" ? `${code} Your message was not saved; please send it again.`
+        : "Something went wrong. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -126,6 +140,12 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
             </div>
           )}
 
+          {error && (
+            <div role="alert" className="mb-4 ml-12 max-w-xl rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+
           {typingUsers.length > 0 && (
             <div className="flex items-center gap-2 mb-4 pl-12 text-xs text-slate-500">
               <div className="flex gap-1">
@@ -152,7 +172,11 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
             onChange={(e) => {
               setInput(e.target.value);
               autoResize();
-              sendTyping(true);
+              const now = Date.now();
+              if (now - lastTypingSent.current > 1500) {
+                lastTypingSent.current = now;
+                sendTyping(true);
+              }
               if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
               typingStopTimer.current = setTimeout(() => sendTyping(false), 2000);
             }}

@@ -22,6 +22,28 @@ const ALLOWED_FILE_TYPES = [
 
 const isAllowedFileType = (mime) => ALLOWED_FILE_TYPES.some((re) => re.test(mime || ''));
 
+const startsWith = (buf, bytes) => bytes.every((b, i) => buf[i] === b);
+
+/**
+ * The MIME type comes from the client, so for the types we can verify, the file's leading bytes must
+ * match it (an HTML page labelled image/png is rejected). Types without a reliable signature
+ * (audio/video, legacy Office) are accepted on the allow-list alone.
+ */
+const contentMatchesType = (mime, buf) => {
+  if (!Buffer.isBuffer(buf) || buf.length === 0) return false;
+  switch (true) {
+    case mime === 'image/png': return startsWith(buf, [0x89, 0x50, 0x4e, 0x47]);
+    case mime === 'image/jpeg': return startsWith(buf, [0xff, 0xd8, 0xff]);
+    case mime === 'image/gif': return startsWith(buf, [0x47, 0x49, 0x46, 0x38]);
+    case mime === 'image/webp': return startsWith(buf, [0x52, 0x49, 0x46, 0x46]) && buf.subarray(8, 12).toString('latin1') === 'WEBP';
+    case mime === 'application/pdf': return buf.subarray(0, 1024).includes('%PDF-');
+    case mime === 'application/zip' || mime.startsWith('application/vnd.openxmlformats-officedocument.'):
+      return startsWith(buf, [0x50, 0x4b, 0x03, 0x04]);
+    case /^text\/(plain|csv|markdown)$/.test(mime): return !buf.subarray(0, 8192).includes(0);
+    default: return true;
+  }
+};
+
 const MESSAGE_SELECT = `
   SELECT m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at, m.deleted_at,
          m.attachment_name, m.attachment_type, m.attachment_size, m.reply_to_id,
@@ -163,6 +185,7 @@ const sendAttachment = async (conversationId, userId, file, { body, replyToId } 
   if (!file) throw httpError(400, 'A file is required');
   if (file.size > MAX_FILE_BYTES) throw httpError(413, 'File is too large (max 25 MB)');
   if (!isAllowedFileType(file.mimetype)) throw httpError(415, 'This file type is not allowed');
+  if (!contentMatchesType(file.mimetype, file.buffer)) throw httpError(415, 'The file content does not match its type');
 
   const caption = typeof body === 'string' ? body.trim().slice(0, MAX_BODY) : '';
   const path = await chatStorage.upload(conversationId, file.buffer, file.originalname, file.mimetype);
@@ -213,6 +236,6 @@ const markRead = async (conversationId, userId) => {
 };
 
 module.exports = {
-  isAllowedFileType, toDto, listMessages, sendMessage, sendAttachment,
+  isAllowedFileType, contentMatchesType, toDto, listMessages, sendMessage, sendAttachment,
   getAttachmentUrl, deleteMessage, markRead, MAX_FILE_BYTES,
 };

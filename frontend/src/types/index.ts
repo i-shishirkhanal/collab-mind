@@ -51,6 +51,10 @@ export interface Citation {
   location_label?: string; // "Page 3", "Slide 2", "Sheet: Yield", "Section: Methods"
   chunk_index?: number;
   excerpt?: string; // added to help rendering
+  // Phase 3: resolved against the retrieved chunk server-side
+  index?: number; // the [n] marker used in the answer text
+  source_id?: string;
+  similarity?: number;
 }
 
 export interface ChatMessage {
@@ -60,8 +64,20 @@ export interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
   citations?: Citation[];
-  metadata?: { citations?: Citation[] };
+  metadata?: ChatMessageMetadata;
   created_at: string;
+}
+
+// Stored with each assistant message by the backend (Phase 3). All fields optional:
+// older messages only have `citations`.
+export interface ChatMessageMetadata {
+  citations?: Citation[];
+  // grounded | uncited (answer cites no source) | no_answer | no_sources
+  grounding?: 'grounded' | 'uncited' | 'no_answer' | 'no_sources' | null;
+  warnings?: string[];
+  task?: 'chat' | 'study' | 'research' | null;
+  model?: { provider: string; tier: 'flash' | 'pro'; model_used: string; fallback_used: boolean } | null;
+  usage?: { total_tokens?: number | null } | null;
 }
 
 export interface AgentRun {

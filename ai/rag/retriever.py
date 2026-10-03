@@ -89,6 +89,19 @@ def _vec(v: Sequence[float]) -> str:
     return "[" + ",".join(repr(float(x)) for x in v) + "]"
 
 
+async def _tune_vector_search(conn, wanted: int) -> None:
+    """The HNSW index spans every workspace and the workspace/status filters apply after the index
+    scan, so a small workspace in a big corpus could get few or no rows back. A wider candidate list
+    (all pgvector versions) and iterative scans (pgvector >= 0.8) keep recall up."""
+    # Best-effort: tuning must never make a search fail (older pgvector lacks iterative scans).
+    for statement in (f"SET hnsw.ef_search = {max(100, min(int(wanted) * 4, 1000))}",
+                      "SET hnsw.iterative_scan = relaxed_order"):
+        try:
+            await conn.execute(statement)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 async def retrieve_chunks(
     pool: asyncpg.Pool,
     workspace_id: str,
@@ -109,6 +122,7 @@ async def retrieve_chunks(
     pool_size = max(cfg.candidates, top_k)
 
     async with pool.acquire() as conn:
+        await _tune_vector_search(conn, pool_size)
         vector_rows = [dict(r) for r in await conn.fetch(VECTOR_SQL, workspace_id, vec, pool_size, ids, types)]
         fts_rows: list[dict] = []
         if cfg.hybrid and query.strip():

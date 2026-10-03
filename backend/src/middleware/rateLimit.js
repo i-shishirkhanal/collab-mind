@@ -24,6 +24,8 @@ const sweeper = setInterval(() => {
 }, 60_000);
 sweeper.unref();
 
+const REDIS_TIMEOUT_MS = 750;
+
 const redisIncr = async (key, windowMs) => {
   const redis = require('../db/redis');
   const k = `rl:${key}`;
@@ -32,9 +34,15 @@ const redisIncr = async (key, windowMs) => {
   return { count, retryAfterMs: ttl < 0 ? windowMs : ttl };
 };
 
+/** Redis commands queue while the client reconnects; never let that stall a request. */
+const withTimeout = (promise, ms) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error(`Redis timed out after ${ms}ms`)), ms);
+  promise.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+});
+
 const incr = async (key, windowMs) => {
   if (process.env.RATE_LIMIT_STORE === 'redis') {
-    try { return await redisIncr(key, windowMs); } catch (err) {
+    try { return await withTimeout(redisIncr(key, windowMs), REDIS_TIMEOUT_MS); } catch (err) {
       console.error('[RateLimit] Redis store failed, using memory:', err.message);
     }
   }
@@ -71,6 +79,21 @@ const emailKey = (req) => {
   return e ? e.slice(0, 254) : null;
 };
 
+/**
+ * Per-user limiter for endpoints that cost money or CPU (LLM calls, embeddings, uploads).
+ * Must run after `authenticate`. The limit comes from an env var so deployments can tune it.
+ */
+const perUser = (name, envVar, defaultMax, windowMs = 60_000) => async (req, res, next) => {
+  const max = Number(process.env[envVar]) > 0 ? Number(process.env[envVar]) : defaultMax;
+  return rateLimit({ name, windowMs, max, keyFn: (r) => (r.user && r.user.id) || clientIp(r) })(req, res, next);
+};
+
+/** Same counter for non-HTTP callers (Socket.io events). Resolves { allowed, retryAfterSec }. */
+const consume = async (name, id, max, windowMs = 60_000) => {
+  const { count, retryAfterMs } = await incr(`${name}:${id}`, windowMs);
+  return { allowed: count <= max, retryAfterSec: Math.ceil(retryAfterMs / 1000) };
+};
+
 const _resetForTests = () => memory.clear();
 
-module.exports = { rateLimit, emailKey, clientIp, _resetForTests };
+module.exports = { rateLimit, perUser, consume, emailKey, clientIp, _resetForTests };

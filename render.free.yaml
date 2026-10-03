@@ -1,0 +1,86 @@
+# Free-tier Render Blueprint for TESTING only (backend + AI + Key Value). The frontend goes on Vercel
+# (Render's 750 free instance-hours/month cannot keep three always-on services up).
+# Free instances sleep after ~15 min idle: websockets drop, and the call sweeper / hourly purge pause.
+# Secrets (sync: false) are entered in the Render dashboard, never committed.
+# Use via: Render dashboard > New > Blueprint > pick this file (set "Blueprint path" to render.free.yaml).
+services:
+  - type: keyvalue
+    name: collabmind-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []                    # internal connections only
+
+  - type: web
+    name: collabmind-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: RATE_LIMIT_STORE
+        value: memory                  # single instance in testing
+      - key: DATABASE_URL              # Supabase "Session pooler" connection string
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: collabmind-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AI_SERVICE_URL            # https://collabmind-ai.onrender.com (or the internal URL)
+        sync: false
+      - key: AI_SERVICE_TOKEN          # >= 32 random chars; same value as the AI service
+        sync: false
+      - key: APP_URL                   # Vercel frontend URL
+        sync: false
+      - key: CORS_ORIGINS              # same Vercel URL, no trailing slash
+        sync: false
+      - key: SMTP_URL                  # required in production; Brevo/Resend/Gmail app password
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: GCS_BUCKET_NAME           # optional for testing; see ALLOW_LOCAL_STORAGE_FALLBACK
+        sync: false
+      - key: ALLOW_LOCAL_STORAGE_FALLBACK
+        value: "true"                  # ephemeral disk: uploads vanish on restart; testing only
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+  - type: web
+    name: collabmind-ai
+    runtime: docker
+    plan: free
+    rootDir: ai
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT                      # the Dockerfile CMD listens on 8000
+        value: "8000"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: collabmind-redis
+          property: connectionString
+      - key: AI_SERVICE_TOKEN
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.deepseek.com
+      - key: EMBEDDING_BASE_URL        # https://api.siliconflow.com/v1
+        sync: false
+      - key: EMBEDDING_API_KEY
+        sync: false
+      - key: GCS_BUCKET_NAME
+        sync: false

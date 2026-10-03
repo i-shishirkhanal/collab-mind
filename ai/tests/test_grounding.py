@@ -83,3 +83,17 @@ def test_context_budget_drops_overflow_but_keeps_best_chunk():
     big = [chunk(idx=i, text="x" * 600) for i in range(5)]
     assert len(select_passages(big, 1500)) == 2
     assert len(select_passages(big, 10)) == 1
+
+
+# ── Phase 4 regressions found with a live gateway ─────────────────────────────
+
+def test_a_repeated_refusal_is_still_a_refusal_and_is_collapsed():
+    # Observed live: the model emitted the refusal sentence twice with no separator.
+    g = resolve_citations(NO_ANSWER + NO_ANSWER, P)
+    assert (g.grounding, g.answer, g.citations, g.warnings) == ("no_answer", NO_ANSWER, [], [])
+    assert resolve_citations(f"{NO_ANSWER}\n\n{NO_ANSWER} ", P).grounding == "no_answer"
+
+
+def test_refusal_plus_real_content_is_not_treated_as_a_bare_refusal():
+    g = resolve_citations(f"{NO_ANSWER} However, light matters [1].", P)
+    assert g.grounding == "grounded" and [c.index for c in g.citations] == [1]

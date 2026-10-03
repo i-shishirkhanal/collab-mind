@@ -125,7 +125,7 @@ async def _mark_failed(pool: asyncpg.Pool, workspace_id: str, source_id: str, me
             SET    status = 'failed',
                    metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
                    updated_at = NOW()
-            WHERE  id = $1 AND workspace_id = $2
+            WHERE  id = $1 AND workspace_id = $2 AND status <> 'ready'
             """,
             source_id,
             workspace_id,

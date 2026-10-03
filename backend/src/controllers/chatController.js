@@ -53,11 +53,24 @@ const sendMessage = async (req, res, next) => {
       .slice(-20)
       .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
 
+    // Optional: restrict answers to specific documents, or force the model tier.
+    // (The AI service only searches this workspace regardless of what ids are sent.)
+    const { source_ids, task } = req.body;
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (source_ids !== undefined && (!Array.isArray(source_ids) || source_ids.length > 50
+        || !source_ids.every((id) => typeof id === 'string' && UUID.test(id)))) {
+      return res.status(400).json({ error: 'source_ids must be an array of source ids' });
+    }
+    if (task !== undefined && !['chat', 'study', 'research'].includes(task)) {
+      return res.status(400).json({ error: "task must be 'chat', 'study' or 'research'" });
+    }
+
     const result = await chatService.sendChatMessage(
       req.params.workspaceId,
       req.user.id,
       message.trim(),
-      history
+      history,
+      { sourceIds: source_ids, task }
     );
 
     res.status(201).json(result);

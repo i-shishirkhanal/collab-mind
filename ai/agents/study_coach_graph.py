@@ -56,18 +56,11 @@ async def analyze_sources(state: StudyCoachState) -> dict:
             "No indexed workspace content is relevant to this goal. Upload or index sources first."
         )
 
-    context = "
----
-".join(c["content"] for c in chunks)
+    context = "\n---\n".join(c["content"] for c in chunks)
     prompt = (
-        f"Extract a comma-separated list of 3-5 core study topics from these passages,
-"
-        f"tailored to the user's goal: '{goal}'.
-
-"
-        f"{context}
-
-Topics (comma separated only):"
+        f"Extract a comma-separated list of 3-5 core study topics from these passages,\n"
+        f"tailored to the user's goal: '{goal}'.\n\n"
+        f"{context}\n\nTopics (comma separated only):"
     )
     text = await _ask(state, prompt, "agent_topics")
     topics = [t.strip() for t in text.split(",") if t.strip()]

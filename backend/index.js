@@ -38,12 +38,27 @@ require('./src/services/agentSubscriber').initAgentSubscriber(io);
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 app.use(helmet());                          // Secure HTTP headers
 app.use(cors({ origin: config.corsOrigins() })); // Explicit origin allow-list (CORS_ORIGINS)
-app.use(morgan('dev'));                      // Request logging
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev')); // Request logging
 app.use(express.json({ limit: '100kb' }));  // Parse JSON bodies
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
-// ── Health check ───────────────────────────────────────────────────────────────
+// ── Health (liveness) and readiness (dependencies) ─────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+app.get('/ready', async (_req, res) => {
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+  const checks = { database: false, redis: false };
+  try { await withTimeout(require('./src/db/postgres').query('SELECT 1'), 2000); checks.database = true; } catch (_) { /* reported below */ }
+  try { await withTimeout(require('./src/db/redis').ping(), 2000); checks.redis = true; } catch (_) { /* reported below */ }
+  const ok = checks.database && checks.redis;
+  res.status(ok ? 200 : 503).json({ status: ok ? 'ready' : 'degraded', checks });
+});
+
+// Coarse per-IP ceiling for the whole API (specific, tighter limits sit on the routes themselves).
+if (process.env.NODE_ENV !== 'test') {
+  const { rateLimit } = require('./src/middleware/rateLimit');
+  const perMinute = Number(process.env.API_RATE_LIMIT_PER_MIN) > 0 ? Number(process.env.API_RATE_LIMIT_PER_MIN) : 600;
+  app.use('/api', rateLimit({ name: 'api-ip', windowMs: 60_000, max: perMinute }));
+}
 
 // ── Mount routers ──────────────────────────────────────────────────────────────
 app.use('/api/auth',       authRoutes);
@@ -72,5 +87,25 @@ require('./src/services/callService').startSweeper(); // expires unanswered / ab
 server.listen(PORT, () => {
   console.log(`✅  CollabMind backend listening on http://localhost:${PORT}`);
 });
+
+// Graceful shutdown: stop accepting work, let in-flight requests finish, close connections.
+let shuttingDown = false;
+const shutdown = (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[Shutdown] ${signal} received, closing…`);
+  const force = setTimeout(() => process.exit(1), 10_000);
+  force.unref();
+  io.close(() => {
+    server.close(async () => {
+      try { await require('./src/db/postgres').end(); } catch (_) { /* ignore */ }
+      try { await require('./src/db/redis').quit(); } catch (_) { /* ignore */ }
+      process.exit(0);
+    });
+  });
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => console.error('[Process] Unhandled rejection:', reason));
 
 module.exports = server; // Exporting server for testing if needed

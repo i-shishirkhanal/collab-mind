@@ -4,6 +4,7 @@ const authenticate           = require('../middleware/authenticate');
 const requireWorkspaceMember = require('../middleware/requireWorkspaceMember');
 const requireRole            = require('../middleware/requireRole');
 const { isUuid }             = require('../utils/http');
+const { perUser }            = require('../middleware/rateLimit');
 
 // mergeParams lets us access :workspaceId defined in the parent router (index.js)
 const router = express.Router({ mergeParams: true });
@@ -29,9 +30,13 @@ router.get(
  * Body: { email, role? }
  * Middleware: authenticate → requireWorkspaceMember → requireRole('owner')
  */
+// Adding by email reveals whether an address is registered, so it is tightly limited per user.
+const addMemberLimit = perUser('member-add', 'MEMBER_ADD_RATE_LIMIT_PER_HOUR', 20, 60 * 60 * 1000);
+
 router.post(
   '/:workspaceId/members',
   authenticate,
+  addMemberLimit,
   requireWorkspaceMember,
   requireRole('owner'),
   memberController.addMember,
@@ -56,11 +61,15 @@ router.patch(
  * Remove a member by their user id. Only owners may remove members.
  * Middleware: authenticate → requireWorkspaceMember → requireRole('owner')
  */
+// Owners can remove anyone; any member can remove THEMSELVES (leave the workspace).
+const ownerOrSelf = (req, res, next) =>
+  (req.params.userId === req.user.id ? next() : requireRole('owner')(req, res, next));
+
 router.delete(
   '/:workspaceId/members/:userId',
   authenticate,
   requireWorkspaceMember,
-  requireRole('owner'),
+  ownerOrSelf,
   memberController.removeMember,
 );
 

@@ -48,6 +48,8 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
         await conn.execute(
             "ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS location_label TEXT"
         )
+        # Phase 4: the study-coach graph writes this on completion/failure.
+        await conn.execute("ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ")
         # Phase 3 additions (same DDL as supabase/migrations/20261002020000_*).
         await conn.execute("ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS embedding_model TEXT")
         await conn.execute("ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS embedding_dim INT")

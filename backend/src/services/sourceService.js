@@ -5,7 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 // The AI service gives up on a document after EXTRACTION_TIMEOUT_SECONDS (180s
 // by default) and always writes a terminal status. A source still "processing"
 // well past that means the AI service died mid-job, so it may be retried.
-const STALE_PROCESSING_MINUTES = () => Number(process.env.SOURCE_STALE_MINUTES) || 10;
+// (30 min default: CPU-only BGE-M3 indexing of a large document can take many minutes.)
+const STALE_PROCESSING_MINUTES = () => Number(process.env.SOURCE_STALE_MINUTES) || 30;
 
 const SOURCE_COLUMNS = `id, workspace_id, name, type, url, status, metadata,
                         created_by, created_at, updated_at`;
@@ -100,6 +101,14 @@ const triggerAiEmbedding = async (workspaceId, sourceId, storageUrl) => {
     // Any other HTTP response means the AI service ran and recorded its own
     // outcome. Auth rejections (401/403) and 503 mean it never started the job.
     if (err.response && ![401, 403, 503].includes(err.response.status)) return;
+    // Our wait timed out but the AI service accepted the job and may well still be
+    // working (CPU embedding of a big document is slow). It always writes the final
+    // status itself; declaring failure here would show a false error and invite a
+    // duplicate retry. If it truly died, the stale-'processing' retry rule recovers.
+    if (!err.response && (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT')) {
+      console.warn(`[AI Trigger] /embed for source ${sourceId} still running after ${err.message}; leaving it 'processing'.`);
+      return;
+    }
     console.error(`[AI Trigger Error] /embed for source ${sourceId}: ${err.message}`);
     await markSourceFailed(
       workspaceId,

@@ -1,29 +1,21 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSession } from "next-auth/react";
 
-const TOKEN_KEY = "supabase_auth_token";
+// Older builds copied the backend session token into localStorage under these keys.
+// Nothing reads them any more (lib/authToken.ts takes the token from the NextAuth
+// session), and a bearer token in localStorage is readable by any injected script,
+// so remove leftovers from browsers that used an older build.
+const LEGACY_TOKEN_KEYS = ["supabase_auth_token", "demo-guest-token"];
 
-/**
- * apiCall() and the socket hook read the session token from localStorage
- * rather than from next-auth's session object directly (they run outside
- * React in some cases). This keeps that key in sync with the real
- * next-auth session so requests carry the actual signed backend JWT
- * instead of silently falling back to the shared demo identity.
- */
 export function TokenSync() {
-  const { data: session, status } = useSession();
-
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = (session as any)?.accessToken;
-    if (status === "authenticated" && token) {
-      localStorage.setItem(TOKEN_KEY, token);
-    } else if (status === "unauthenticated") {
-      localStorage.removeItem(TOKEN_KEY);
+    try {
+      LEGACY_TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
+    } catch {
+      /* storage unavailable (private mode / blocked): nothing to clean */
     }
-  }, [session, status]);
+  }, []);
 
   return null;
 }

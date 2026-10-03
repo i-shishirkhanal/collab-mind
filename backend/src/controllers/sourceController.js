@@ -10,11 +10,15 @@ const BINARY_TYPES = ['pdf', 'docx', 'pptx', 'xlsx', 'xls', 'csv', 'html', 'htm'
 /**
  * listSources — GET /workspaces/:workspaceId/sources
  */
+// Uploaded files live at internal storage paths (local:///app/uploads/…, gs://bucket/…); only web
+// links are meaningful to clients.
+const publicSource = (s) => (s && s.type !== 'url' && s.type !== 'youtube' ? { ...s, url: null } : s);
+
 const listSources = async (req, res, next) => {
   try {
     const { type } = req.query;
     const sources = await sourceService.getWorkspaceSources(req.params.workspaceId, { type });
-    res.json(sources);
+    res.json(sources.map(publicSource));
   } catch (err) {
     next(err);
   }
@@ -28,7 +32,7 @@ const getSource = async (req, res, next) => {
   try {
     const source = await sourceService.getSource(req.params.workspaceId, req.params.sourceId);
     if (!source) throw httpError(404, 'Source not found');
-    res.json(source);
+    res.json(publicSource(source));
   } catch (err) {
     next(err);
   }
@@ -65,12 +69,27 @@ const uploadFile = async (req, res, next) => {
       req.file.mimetype
     );
 
-    const sourceRecord = await sourceService.createSourceRecord(workspaceId, req.user.id, {
-      name: checked.name,
-      type,
-      url: gsUri,
-      metadata: { sha256: checked.sha256, size_bytes: checked.size },
-    });
+    let sourceRecord;
+    try {
+      sourceRecord = await sourceService.createSourceRecord(workspaceId, req.user.id, {
+        name: checked.name,
+        type,
+        url: gsUri,
+        metadata: { sha256: checked.sha256, size_bytes: checked.size },
+      });
+    } catch (err) {
+      // Two identical uploads raced past the check above: the unique index caught the loser.
+      if (err.code === '23505' && /sha256/.test(err.constraint || '')) {
+        const winner = await sourceService.findDuplicateByHash(workspaceId, checked.sha256);
+        await storageService.deleteStoredFile(gsUri);
+        gsUri = null;
+        return res.status(409).json({
+          error: `"${winner ? winner.name : checked.name}" with identical content is already in this workspace.`,
+          source_id: winner && winner.id,
+        });
+      }
+      throw err;
+    }
     gsUri = null; // owned by the record now
 
     sourceService.triggerAiEmbedding(workspaceId, sourceRecord.id, sourceRecord.url).catch(console.error);
@@ -100,7 +119,8 @@ const addUrlSource = async (req, res, next) => {
     }
     await assertPublicHttpUrl(url); // blocks internal/metadata addresses (SSRF)
 
-    const isYoutube = url.includes('youtube.com') || url.includes('youtu.be');
+    const host = new URL(url).hostname.toLowerCase();
+    const isYoutube = ['youtube.com', 'youtu.be'].some((h) => host === h || host.endsWith(`.${h}`));
     const type = isYoutube ? 'youtube' : 'url';
     const name = url.slice(0, 255);
 
@@ -187,10 +207,18 @@ const summarizeSource = async (req, res, next) => {
     const response = await aiClient.post('/sources/summarize', {
       workspace_id: workspaceId,
       source_id: sourceId
-    });
+    }, { timeout: 120_000 }); // LLM summary of a whole document can exceed the default 30s
     res.json(response.data);
   } catch (err) {
-    if (err.response) return res.status(err.response.status >= 500 ? 502 : err.response.status).json({ error: 'The AI service could not complete the request' });
+    if (err.response) {
+      const status = err.response.status;
+      const detail = err.response.data && err.response.data.detail;
+      if ([404, 429, 503, 504].includes(status) && typeof detail === 'string') {
+        return res.status(status).json({ error: detail }); // safe, user-facing messages from the AI service
+      }
+      // A 401/403 is OUR credential problem (a 401 would sign the user out in the browser): hide it as a 502.
+      return res.status(502).json({ error: 'The AI service could not complete the request' });
+    }
     next(err);
   }
 };

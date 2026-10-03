@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Workspace, WorkspaceMember, Source, ChatMessage, Citation } from '@/types';
+import { mergeMessage, replaceOptimistic } from '@/lib/chatMessages';
 
 // ========================
 // Chat Store
@@ -9,6 +10,7 @@ interface ChatState {
   isLoading: boolean;
   activeCitation: Citation | null;
   addMessage: (message: ChatMessage) => void;
+  replaceMessage: (localId: string, persisted: ChatMessage) => void;
   setLoading: (loading: boolean) => void;
   setActiveCitation: (citation: Citation | null) => void;
   setMessages: (messages: ChatMessage[]) => void;
@@ -18,7 +20,9 @@ export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   isLoading: false,
   activeCitation: null,
-  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  // Idempotent by id: the same message can arrive via the REST response and via the socket.
+  addMessage: (message) => set((state) => ({ messages: mergeMessage(state.messages, message) })),
+  replaceMessage: (localId, persisted) => set((state) => ({ messages: replaceOptimistic(state.messages, localId, persisted) })),
   setLoading: (loading) => set({ isLoading: loading }),
   setActiveCitation: (citation) => set({ activeCitation: citation }),
   setMessages: (messages) => set({ messages }),

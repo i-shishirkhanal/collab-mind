@@ -2,6 +2,7 @@
 
 import { useChatStore } from "@/lib/store";
 import { ChatMessage as ChatMessageType, Citation } from "@/types";
+import { citationForMarker } from "@/lib/citations";
 import React from "react";
 
 interface ChatMessageProps {
@@ -13,8 +14,19 @@ const NOT_FOUND_MESSAGE = "I could not find an answer in your workspace sources.
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const citations = message.metadata?.citations ?? message.citations ?? [];
+  const grounding = message.metadata?.grounding ?? null;
+  const warnings = message.metadata?.warnings ?? [];
   const setActiveCitation = useChatStore(s => s.setActiveCitation);
-  const isUngrounded = !isUser && message.content.trim() === NOT_FOUND_MESSAGE;
+  const isUngrounded = !isUser && (
+    grounding === 'no_sources' || grounding === 'no_answer' || message.content.trim() === NOT_FOUND_MESSAGE
+  );
+  // The model's answer used no source passage at all: say so instead of implying it is sourced.
+  const isUncited = !isUser && !isUngrounded && grounding === 'uncited';
+
+  // [n] in the text is the passage number the server assigned (citation.index). Only the
+  // cited passages are returned, in order of first use, so the array position is NOT n.
+  // Messages stored before this field existed fall back to position.
+  const citationFor = (n: number): Citation | null => citationForMarker(citations, n);
 
   // Parse inline citations like [1], [2]
   const parseInlineCitations = (text: string) => {
@@ -29,8 +41,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       }
 
       const numStr = match[1];
-      const index = parseInt(numStr, 10) - 1;
-      const citation = citations[index] ?? null;
+      const citation = citationFor(parseInt(numStr, 10));
 
       if (citation) {
          parts.push(
@@ -80,6 +91,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="whitespace-pre-wrap">
             {isUser ? message.content : parseInlineCitations(message.content)}
           </div>
+
+          {isUncited && (
+            <div className="mt-2.5 pt-2.5 border-t border-amber-500/30 text-[11px] text-amber-400/90 not-italic">
+              No source passage was cited for this answer. Treat it as unverified.
+            </div>
+          )}
+
+          {!isUser && warnings.length > 0 && !isUncited && (
+            <div className="mt-2 text-[11px] text-amber-400/80 not-italic">{warnings.join(' ')}</div>
+          )}
 
           {!isUser && !isUngrounded && citations.length > 0 && (
             <div className="mt-2.5 pt-2.5 border-t border-slate-700/50 flex items-center gap-1.5 text-[11px] text-indigo-400/90 not-italic">

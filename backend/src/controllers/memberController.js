@@ -75,16 +75,12 @@ const updateMemberRole = async (req, res, next) => {
 
 /**
  * removeMember — DELETE /workspaces/:workspaceId/members/:userId
- * Requires owner role. Owners cannot remove themselves (guard below).
+ * Owners can remove anyone; any member can remove themselves (leave). The service refuses to
+ * remove the last owner, so a workspace can never be left without one.
  */
 const removeMember = async (req, res, next) => {
   try {
     const { workspaceId, userId } = req.params;
-
-    // Prevent self-removal of the requesting owner
-    if (userId === req.user.id) {
-      return res.status(400).json({ error: 'You cannot remove yourself from the workspace' });
-    }
 
     const wasRemoved = await memberService.removeMember(workspaceId, userId);
 

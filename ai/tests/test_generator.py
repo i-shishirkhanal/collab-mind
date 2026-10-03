@@ -146,3 +146,13 @@ def test_summary_uses_flash_and_requires_indexed_content(setup, monkeypatch):
     assert (r.summary, r.word_count, r.source_name) == ("S", 2, "n.pdf") and rec.models == [FLASH]
     with pytest.raises(gen.NoRelevantSourcesError):
         run(gen.summarize_source(Pool([]), req))
+
+
+def test_json_with_trailing_garbage_or_leading_prose_takes_the_first_object():
+    # Observed live (JSON mode): a valid object followed by repeated junk.
+    assert gen._parse_json('{"ok": true}# Benchmark Output\n\n{"ok": true}{"ok') == {"ok": True}
+    assert gen._parse_json('Sure! Here you go: {"a": [1, 2]} hope that helps {"b": 1}') == {"a": [1, 2]}
+    with pytest.raises(errors.MalformedResponseError):
+        gen._parse_json('{"unterminated": ')
+    with pytest.raises(errors.MalformedResponseError):
+        gen._parse_json("no json here")

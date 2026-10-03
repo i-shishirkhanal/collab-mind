@@ -17,18 +17,40 @@ const listWorkspaces = async (req, res, next) => {
  * createWorkspace — POST /workspaces
  * Body: { name, description?, avatar_url? }
  */
+/**
+ * Validates workspace fields. Returns { error } or { value } with trimmed strings. Omitted fields stay
+ * undefined; an empty description/avatar_url string clears the field.
+ */
+const validateFields = (body, { requireName }) => {
+  const { name, description, avatar_url } = body && typeof body === 'object' ? body : {};
+  const value = {};
+  if (name !== undefined || requireName) {
+    if (typeof name !== 'string' || name.trim() === '') return { error: 'name is required' };
+    if (name.trim().length > 120) return { error: 'name must be at most 120 characters' };
+    value.name = name.trim();
+  }
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string' || description.length > 2000) return { error: 'description must be text of at most 2000 characters' };
+    value.description = description.trim();
+  }
+  if (avatar_url !== undefined && avatar_url !== null) {
+    if (typeof avatar_url !== 'string' || avatar_url.length > 2048 || (avatar_url !== '' && !/^https:\/\//i.test(avatar_url))) {
+      return { error: 'avatar_url must be an https URL' };
+    }
+    value.avatar_url = avatar_url;
+  }
+  return { value };
+};
+
 const createWorkspace = async (req, res, next) => {
   try {
-    const { name, description, avatar_url } = req.body;
-
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return res.status(400).json({ error: 'name is required' });
-    }
+    const { error, value } = validateFields(req.body, { requireName: true });
+    if (error) return res.status(400).json({ error });
 
     const workspace = await workspaceService.createWorkspace(req.user.id, {
-      name: name.trim(),
-      description,
-      avatar_url,
+      name: value.name,
+      description: value.description,
+      avatar_url: value.avatar_url,
     });
 
     res.status(201).json(workspace);
@@ -62,11 +84,12 @@ const getWorkspace = async (req, res, next) => {
  */
 const updateWorkspace = async (req, res, next) => {
   try {
-    const { name, description, avatar_url } = req.body;
+    const { error, value } = validateFields(req.body, { requireName: false });
+    if (error) return res.status(400).json({ error });
     const updated = await workspaceService.updateWorkspace(req.params.workspaceId, {
-      name,
-      description,
-      avatar_url,
+      name: value.name,
+      description: value.description,
+      avatar_url: value.avatar_url,
     });
 
     if (!updated) {

@@ -2,16 +2,20 @@
 schemas.py — All Pydantic request/response models for the AI service.
 """
 
-from pydantic import BaseModel, HttpUrl
-from typing import Literal, Optional
+from pydantic import BaseModel, Field, HttpUrl
+from typing import Annotated, Literal, Optional
+
+# Bounds on every client-controlled field: they cap prompt size (cost) and reject junk early.
+Id = Annotated[str, Field(min_length=1, max_length=64)]
+ShortText = Annotated[str, Field(min_length=1, max_length=500)]
 
 
 # ── Embed endpoint ────────────────────────────────────────────────────────────
 
 class EmbedRequest(BaseModel):
-    workspace_id: str
-    source_id: str
-    storage_url: str
+    workspace_id: Id
+    source_id: Id
+    storage_url: Annotated[str, Field(min_length=1, max_length=2200)]
 
 
 class EmbedResponse(BaseModel):
@@ -22,8 +26,8 @@ class EmbedResponse(BaseModel):
 # ── Summarize endpoint ────────────────────────────────────────────────────────
 
 class SummarizeRequest(BaseModel):
-    workspace_id: str
-    source_id: str
+    workspace_id: Id
+    source_id: Id
 
 
 class SummarizeResponse(BaseModel):
@@ -37,18 +41,18 @@ class SummarizeResponse(BaseModel):
 # ── Chat endpoint ─────────────────────────────────────────────────────────────
 
 class ChatMessage(BaseModel):
-    role: str
-    content: str
+    role: Literal["user", "assistant"]
+    content: Annotated[str, Field(max_length=8000)]
 
 
 class ChatRequest(BaseModel):
-    workspace_id: str
-    message: str
-    conversation_history: list[ChatMessage] = []
+    workspace_id: Id
+    message: Annotated[str, Field(min_length=1, max_length=8000)]
+    conversation_history: Annotated[list[ChatMessage], Field(max_length=40)] = []
     # Optional: authenticated user (for usage accounting only; authorization is
     # the backend's job), document-level constraint, and explicit task routing.
-    user_id: Optional[str] = None
-    source_ids: Optional[list[str]] = None
+    user_id: Optional[Id] = None
+    source_ids: Optional[Annotated[list[Id], Field(max_length=50)]] = None
     task: Optional[Literal["chat", "study", "research"]] = None
 
 
@@ -97,9 +101,9 @@ class ChatResponse(BaseModel):
 # ── Agent endpoints (Study Coach) ─────────────────────────────────────────────
 
 class StudyCoachRequest(BaseModel):
-    workspace_id: str
-    user_id: str
-    goal: str
+    workspace_id: Id
+    user_id: Id
+    goal: Annotated[str, Field(min_length=1, max_length=2000)]
 
 
 class StudyCoachResponse(BaseModel):
@@ -116,9 +120,9 @@ class AgentStatusResponse(BaseModel):
 # ── Studio endpoints (Content Generation) ─────────────────────────────────────
 
 class FlashcardRequest(BaseModel):
-    workspace_id: str
-    topic: Optional[str] = None
-    count: int = 20
+    workspace_id: Id
+    topic: Optional[Annotated[str, Field(max_length=500)]] = None
+    count: Annotated[int, Field(ge=1, le=50)] = 20
 
 class FlashcardItem(BaseModel):
     front: str
@@ -130,10 +134,10 @@ class FlashcardsResponse(BaseModel):
 
 
 class QuizRequest(BaseModel):
-    workspace_id: str
-    topic: str
-    difficulty: str = "medium"
-    count: int = 10
+    workspace_id: Id
+    topic: ShortText
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    count: Annotated[int, Field(ge=1, le=30)] = 10
 
 class QuizQuestion(BaseModel):
     question: str
@@ -147,8 +151,8 @@ class QuizResponse(BaseModel):
 
 
 class StudyGuideRequest(BaseModel):
-    workspace_id: str
-    topic: str
+    workspace_id: Id
+    topic: ShortText
 
 class StudyGuideSection(BaseModel):
     heading: str
@@ -161,9 +165,9 @@ class StudyGuideResponse(BaseModel):
 
 
 class ReportRequest(BaseModel):
-    workspace_id: str
-    title: str
-    outline_points: list[str]
+    workspace_id: Id
+    title: ShortText
+    outline_points: Annotated[list[ShortText], Field(max_length=30)]
 
 class ReportResponse(BaseModel):
     report_markdown: str

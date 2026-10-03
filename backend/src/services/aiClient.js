@@ -20,4 +20,15 @@ const request = (method, path, { data, timeout = 30_000 } = {}) =>
 const post = (path, data, opts = {}) => request('post', path, { ...opts, data });
 const get = (path, opts = {}) => request('get', path, opts);
 
-module.exports = { post, get, baseURL };
+/** POST that returns the raw response with `data` as a Node stream (server-sent events). */
+const postStream = (path, data, { timeout = 150_000 } = {}) =>
+  axios.request({
+    method: 'post',
+    url: `${baseURL()}${path}`,
+    data,
+    timeout,
+    responseType: 'stream',
+    headers: { Authorization: `Bearer ${aiServiceToken()}` },
+  });
+
+module.exports = { post, get, postStream, baseURL };

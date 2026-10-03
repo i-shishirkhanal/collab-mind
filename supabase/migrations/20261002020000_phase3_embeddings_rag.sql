@@ -33,6 +33,9 @@ BEGIN
     END IF;
 END $$;
 
+-- Citation location ("Page 3", "Slide 2"...). The baseline migrations lack it; the AI
+-- service previously added it at startup only.
+ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS location_label TEXT;
 ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS embedding_model TEXT;
 ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS embedding_dim INT;
 

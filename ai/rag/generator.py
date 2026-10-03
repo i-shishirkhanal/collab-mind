@@ -74,11 +74,13 @@ def _parse_json(text: str) -> dict:
     try:
         data = json.loads(cleaned)
     except ValueError:
-        start, end = cleaned.find("{"), cleaned.rfind("}")
-        if start == -1 or end <= start:
+        # Prose before the object, or junk/repeats after it (observed from a live gateway in JSON
+        # mode: `{"ok": true}# Benchmark Output {"ok": true}…`): take the FIRST complete JSON object.
+        start = cleaned.find("{")
+        if start == -1:
             raise errors.MalformedResponseError("The model did not return valid JSON.") from None
         try:
-            data = json.loads(cleaned[start:end + 1])
+            data, _ = json.JSONDecoder().raw_decode(cleaned[start:])
         except ValueError:
             raise errors.MalformedResponseError("The model did not return valid JSON.") from None
     if not isinstance(data, dict):

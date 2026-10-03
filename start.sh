@@ -14,7 +14,7 @@ if ! check_port 5432 || ! check_port 6379; then
   echo "  ERROR: PostgreSQL or Redis is not running."
   echo "  Start them first:"
   echo ""
-  echo "    sudo docker-compose -f \"$ROOT/docker-compose.yml\" up -d db redis"
+  echo "    docker compose -f \"$ROOT/docker-compose.yml\" up -d redis   # Postgres is external (Supabase) or your own: set DATABASE_URL"
   echo ""
   exit 1
 fi

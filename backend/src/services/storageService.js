@@ -47,6 +47,13 @@ const uploadFileBuffer = async (workspaceId, fileBuffer, originalName, mimeType)
 
       return `gs://${bucketName}/${relativePath}`;
     } catch (err) {
+      // A configured bucket that fails must not silently turn into container-local
+      // storage in production (other instances could never read the file, and the
+      // upload would look successful). Dev/test keeps the convenient fallback.
+      if (process.env.NODE_ENV === 'production' && process.env.ALLOW_LOCAL_STORAGE_FALLBACK !== 'true') {
+        console.error(`[Storage] GCS upload failed (${err.message}); refusing local fallback in production.`);
+        throw Object.assign(new Error('File storage is unavailable right now. Please try again later.'), { status: 503 });
+      }
       console.warn(`[Storage] GCS upload failed (${err.message}). Using local disk fallback.`);
     }
   }

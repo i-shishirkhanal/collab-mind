@@ -106,13 +106,22 @@ const updateWorkspace = async (workspaceId, { name, description, avatar_url }) =
 /**
  * deleteWorkspace
  * ────────────────
- * Hard-deletes a workspace. Cascade constraints in DB handle related rows.
+ * Hard-deletes a workspace. Cascade constraints in DB handle related rows; the
+ * workspace's uploaded files are removed from storage afterwards.
  *
  * @param {string} workspaceId
  * @returns {Promise<void>}
  */
 const deleteWorkspace = async (workspaceId) => {
+  // Cascades remove the rows (sources, chunks, chat, runs) but not the uploaded
+  // files, so remember where they are and remove them once the delete succeeded.
+  const { rows: stored } = await pool.query(
+    `SELECT url FROM sources WHERE workspace_id = $1 AND type NOT IN ('url', 'youtube') AND url IS NOT NULL`,
+    [workspaceId],
+  );
   await pool.query(`DELETE FROM workspaces WHERE id = $1`, [workspaceId]);
+  const { deleteStoredFile } = require('./storageService'); // lazy: pulls in the GCS client
+  await Promise.all(stored.map((r) => deleteStoredFile(r.url))); // best-effort, never throws
 };
 
 module.exports = { getUserWorkspaces, createWorkspace, getWorkspaceById, updateWorkspace, deleteWorkspace };

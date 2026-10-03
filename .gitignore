@@ -2,6 +2,9 @@
 .env
 .env.*
 *.env
+# ...but the documented templates must be versioned
+!.env.example
+!**/.env.example
 
 # Dependencies
 node_modules/
@@ -46,3 +49,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Local tool scratch (Supabase CLI temp output, Claude session files)
+supabase/.temp/
+supabase/.branches/
+.claude/

@@ -17,6 +17,7 @@ import io
 import ipaddress
 import re
 import socket
+import zipfile
 from dataclasses import dataclass
 from typing import Callable, Optional
 from urllib.parse import urljoin, urlparse
@@ -169,6 +170,8 @@ def extract_blocks(
         raise ExtractionError(f"This doesn't look like a valid {ext} file.")
 
     unreadable = _unreadable_message(data, ext)
+    if ext in _ZIP_EXTENSIONS:
+        _reject_zip_bomb(data)
     try:
         result = _markitdown.convert_stream(
             io.BytesIO(data),
@@ -190,6 +193,26 @@ def extract_blocks(
         hint = " It may be a scanned document (no text layer); OCR is not supported yet." if ext == ".pdf" else ""
         raise ExtractionError(f"No readable text was found in this file.{hint}")
     return blocks
+
+
+_ZIP_EXTENSIONS = {".docx", ".pptx", ".xlsx"}
+MAX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024   # total declared size of everything inside the archive
+MAX_ZIP_RATIO = 200                          # declared uncompressed / compressed
+MAX_ZIP_ENTRIES = 5000
+
+
+def _reject_zip_bomb(data: bytes) -> None:
+    """Office files are zip archives. A tiny upload can declare gigabytes of content and exhaust the
+    memory of the service that parses it, so the archive's declared sizes are checked first."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            infos = archive.infolist()
+    except zipfile.BadZipFile:
+        return  # not an archive at all: the normal conversion path reports it as unreadable
+    declared = sum(i.file_size for i in infos)
+    if (len(infos) > MAX_ZIP_ENTRIES or declared > MAX_UNCOMPRESSED_BYTES
+            or declared > max(len(data), 1) * MAX_ZIP_RATIO):
+        raise ExtractionError("This file expands to an unreasonable size and cannot be processed.")
 
 
 def _pdf_is_encrypted(data: bytes) -> bool:
@@ -218,15 +241,34 @@ def _extension_of(name: str) -> str:
 
 # ── URL fetching with SSRF protection ─────────────────────────────────────────
 
+_NAT64 = ipaddress.ip_network("64:ff9b::/96")
+
+
+def _is_internal_ip(ip: ipaddress._BaseAddress) -> bool:
+    """Loopback/private/link-local/reserved/multicast, including IPv6 spellings
+    that merely wrap an IPv4 address (mapped, NAT64, 6to4, IPv4-compatible).
+    `ipaddress` classifies these differently across Python versions, so the
+    embedded IPv4 address is always checked explicitly."""
+    if (ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+        return True
+    if isinstance(ip, ipaddress.IPv6Address):
+        embedded = [ip.ipv4_mapped, ip.sixtofour]
+        if ip in _NAT64:
+            embedded.append(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF))
+        if int(ip) >> 32 == 0:  # ::/96, deprecated IPv4-compatible
+            embedded.append(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF))
+        return any(v4 is not None and _is_internal_ip(v4) for v4 in embedded)
+    return False
+
+
 def _is_public_host(hostname: str) -> bool:
     try:
         infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror:
         return False
     for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+        if _is_internal_ip(ipaddress.ip_address(info[4][0].split("%")[0])):
             return False
     return True
 

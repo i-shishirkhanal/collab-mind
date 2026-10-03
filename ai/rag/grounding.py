@@ -97,7 +97,10 @@ def citation_for(index: int, chunk: dict) -> Citation:
 
 def resolve_citations(answer: str, passages: list[dict]) -> Grounded:
     text = answer.strip()
-    if text.startswith(NO_ANSWER) and len(text) <= len(NO_ANSWER) + 2:
+    # A refusal is the refusal sentence and nothing else. Some models repeat it
+    # ("…sources.I could not find…sources."), so any number of copies separated by
+    # whitespace/punctuation still counts, and is collapsed to one.
+    if NO_ANSWER in text and re.fullmatch(r"[\s.]*", text.replace(NO_ANSWER, "")):
         return Grounded(NO_ANSWER, [], "no_answer")
 
     warnings: list[str] = []

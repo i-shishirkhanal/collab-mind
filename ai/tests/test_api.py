@@ -9,6 +9,8 @@ import pytest
 
 pytest.importorskip("fastapi.testclient")
 
+import uuid_shim  # noqa: F401  (loads even where the uuid_utils DLL is blocked)
+
 TOKEN = "t" * 40
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
@@ -130,6 +132,12 @@ def test_auth_is_still_required(client):
 def test_models_endpoint_reports_routing_without_secrets(client, monkeypatch):
     main, c = client
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-should-never-appear-123456")
+    # main.py runs load_dotenv(), so a developer's local ai/.env (e.g. live model ids) is in the
+    # environment; pin the values this test asserts instead of depending on it.
+    monkeypatch.setenv("LLM_MODEL_FLASH", "deepseek-flash")
+    monkeypatch.setenv("LLM_MODEL_PRO", "deepseek-v4-pro")
+    monkeypatch.setenv("LLM_FLASH_THINKING", "disabled")
+    monkeypatch.setenv("LLM_PRO_THINKING", "enabled")
     import config
     config.reset_settings_cache()
     r = c.get("/models", headers=AUTH)

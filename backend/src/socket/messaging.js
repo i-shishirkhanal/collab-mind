@@ -76,9 +76,17 @@ const registerMessagingSocket = (io, socket) => {
     }
   });
 
+  const typingSentAt = new Map();
+
   socket.on('conv:typing', ({ conversationId, isTyping } = {}) => {
     // The room check doubles as the authorization check: rooms are only joined for real memberships.
     if (!isUuid(conversationId) || !socket.rooms.has(convRoom(conversationId))) return;
+    // Throttle "started typing" per conversation so a client cannot flood the room.
+    if (isTyping) {
+      const now = Date.now();
+      if (now - (typingSentAt.get(conversationId) || 0) < 1500) return;
+      typingSentAt.set(conversationId, now);
+    }
     socket.to(convRoom(conversationId)).emit('conv:typing', {
       conversationId,
       userId,

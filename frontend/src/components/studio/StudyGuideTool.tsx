@@ -8,19 +8,43 @@ import { Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { generateStudyGuide } from "@/lib/api";
 
+interface GuideResponse {
+  title?: string;
+  sections?: { heading: string; content: string; key_terms?: string[] }[];
+  markdown?: string;
+  content?: string;
+}
+
+/** The API returns { title, sections[] }; render it as Markdown. */
+function guideToMarkdown(data: GuideResponse): string {
+  if (data.markdown || data.content) return data.markdown || data.content || "";
+  const parts: string[] = [];
+  if (data.title) parts.push(`# ${data.title}`);
+  for (const s of data.sections ?? []) {
+    parts.push(`## ${s.heading}`, s.content);
+    if (s.key_terms?.length) parts.push(`**Key terms:** ${s.key_terms.join(", ")}`);
+  }
+  return parts.join("\n\n");
+}
+
 export function StudyGuideTool({ workspaceId }: { workspaceId: string }) {
   const [topic, setTopic] = useState("");
   const [loading, setLoading] = useState(false);
   const [content, setContent] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!topic) return;
+    setError(null);
     setLoading(true);
     try {
       const data = await generateStudyGuide(workspaceId, topic);
-      setContent(data.markdown || data.content || "");
+      setContent(guideToMarkdown(data));
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error && err.message && err.message !== "UNAUTHORIZED"
+        ? err.message
+        : "The study guide could not be generated. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -61,10 +85,17 @@ export function StudyGuideTool({ workspaceId }: { workspaceId: string }) {
         </div>
       )}
 
+      {error && !loading && (
+        <div role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
       {content && !loading && (
         <div className="flex-1 bg-slate-800 rounded-2xl border border-slate-700 p-8 shadow-inner overflow-hidden flex flex-col min-h-[500px]">
           <div className="prose prose-invert prose-indigo max-w-none overflow-y-auto custom-scrollbar pr-4 flex-1">
-            <ReactMarkdown>{content}</ReactMarkdown>
+            {/* Model output built from uploaded documents is untrusted: remote images would be a data-exfiltration channel. */}
+            <ReactMarkdown disallowedElements={["img"]} unwrapDisallowed>{content}</ReactMarkdown>
           </div>
         </div>
       )}
