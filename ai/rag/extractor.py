@@ -32,6 +32,8 @@ URL_TIMEOUT_SECONDS = 15.0
 SUPPORTED_EXTENSIONS = {
     ".pdf", ".docx", ".pptx", ".xlsx", ".xls",
     ".txt", ".md", ".csv", ".html", ".htm", ".json",
+    # images, read with OCR (rag/media.py)
+    ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff",
 }
 
 _EXTENSION_BY_CONTENT_TYPE = {
@@ -160,6 +162,10 @@ def extract_blocks(
             f"Unsupported file type '{ext or 'unknown'}'. "
             f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}."
         )
+
+    from rag import media
+    if ext in media.IMAGE_EXTENSIONS:
+        return media.extract_image(data, filename, ext)
 
     # MarkItDown silently falls back to plain-text decoding when a binary
     # converter fails, which would index the raw file bytes as "content". Reject
@@ -321,13 +327,11 @@ def fetch_url_bytes(
     raise ExtractionError("The link redirected too many times.")
 
 
-_YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
-
-
 def extract_url(url: str, **fetch_kwargs) -> list[Block]:
-    if (urlparse(url).hostname or "").lower() in _YOUTUBE_HOSTS:
-        # Fetching the watch page would index page chrome, not the transcript.
-        raise ExtractionError("YouTube links aren't supported yet. Paste a web page or document link instead.")
+    from rag import media
+    if (urlparse(url).hostname or "").lower() in media.YOUTUBE_HOSTS:
+        # The watch page is page chrome; the transcript is what was said.
+        return media.extract_youtube(url)
 
     body, content_type, final_url = fetch_url_bytes(url, **fetch_kwargs)
     extension = _EXTENSION_BY_CONTENT_TYPE.get(content_type)

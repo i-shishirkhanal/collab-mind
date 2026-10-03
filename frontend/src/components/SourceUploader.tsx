@@ -100,7 +100,7 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
             <span className="font-semibold text-indigo-400">Click to upload</span>
             <span className="text-slate-400"> or drag and drop</span>
           </div>
-          <p className="text-xs text-slate-500">PDF, Word, PowerPoint, Excel, CSV, HTML, Markdown or text (max 50 MB)</p>
+          <p className="text-xs text-slate-500">PDF, Word, PowerPoint, Excel, CSV, HTML, Markdown, text or images (max 50 MB)</p>
         </div>
       </div>
 
@@ -111,7 +111,7 @@ export function SourceUploader({ workspaceId }: { workspaceId: string }) {
             <LinkIcon className="h-4 w-4 text-slate-500" />
           </div>
           <Input 
-            placeholder="Paste a secure web link (e.g. https://docs.google.com/...)" 
+            placeholder="Paste a web page or YouTube link" 
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="pl-10 bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-600"

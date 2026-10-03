@@ -9,6 +9,7 @@ const AGENT_STATUS: Record<string, string> = {
   awaiting_approval: "is waiting for approval",
   generating: "is generating materials",
   done: "finished",
+  completed: "finished",
   failed: "failed",
 };
 

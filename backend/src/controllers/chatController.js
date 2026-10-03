@@ -55,7 +55,7 @@ const sendMessage = async (req, res, next) => {
 
     // Optional: restrict answers to specific documents, or force the model tier.
     // (The AI service only searches this workspace regardless of what ids are sent.)
-    const { source_ids, task } = req.body;
+    const { source_ids, task, mode } = req.body;
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (source_ids !== undefined && (!Array.isArray(source_ids) || source_ids.length > 50
         || !source_ids.every((id) => typeof id === 'string' && UUID.test(id)))) {
@@ -65,12 +65,16 @@ const sendMessage = async (req, res, next) => {
       return res.status(400).json({ error: "task must be 'chat', 'study' or 'research'" });
     }
 
+    if (mode !== undefined && mode !== 'general') {
+      return res.status(400).json({ error: "mode must be 'general' when provided" });
+    }
+
     const result = await chatService.sendChatMessage(
       req.params.workspaceId,
       req.user.id,
       message.trim(),
       history,
-      { sourceIds: source_ids, task }
+      { sourceIds: source_ids, task, mode }
     );
 
     res.status(201).json(result);

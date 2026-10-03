@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const STALE_PROCESSING_MINUTES = () => Number(process.env.SOURCE_STALE_MINUTES) || 30;
 
 const SOURCE_COLUMNS = `id, workspace_id, name, type, url, status, metadata,
-                        created_by, created_at, updated_at`;
+                        created_by, created_at, updated_at, is_active`;
 
 /**
  * getWorkspaceSources
@@ -152,8 +152,20 @@ const deleteSource = async (workspaceId, sourceId) => {
   return rows[0] || null;
 };
 
+/** Switches a source on or off for chat, Studio and agents. The source and its index are kept. */
+const setSourceActive = async (workspaceId, sourceId, isActive) => {
+  const { rows } = await pool.query(
+    `UPDATE sources SET is_active = $3, updated_at = NOW()
+      WHERE id = $1 AND workspace_id = $2
+  RETURNING ${SOURCE_COLUMNS}`,
+    [sourceId, workspaceId, isActive]
+  );
+  return rows[0] || null;
+};
+
 module.exports = {
   getWorkspaceSources,
+  setSourceActive,
   getSource,
   findDuplicateByHash,
   createSourceRecord,

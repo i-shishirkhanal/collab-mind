@@ -195,6 +195,33 @@ const deleteSource = async (req, res, next) => {
 };
 
 /**
+ * setSourceActive — PATCH /workspaces/:workspaceId/sources/:sourceId   body: { is_active: boolean }
+ * Turns a source on or off for everyone's answers, so it follows the same rule as deleting:
+ * whoever added it, or a workspace admin/owner.
+ */
+const setSourceActive = async (req, res, next) => {
+  try {
+    const { workspaceId, sourceId } = req.params;
+    const { is_active: isActive } = req.body || {};
+    if (typeof isActive !== 'boolean') throw httpError(400, 'is_active must be true or false');
+
+    const existing = await sourceService.getSource(workspaceId, sourceId);
+    if (!existing) throw httpError(404, 'Source not found');
+
+    const role = req.membership?.role;
+    const isManager = role === 'admin' || role === 'owner';
+    if (!isManager && existing.created_by !== req.user.id) {
+      throw httpError(403, 'Only the person who added this source, or a workspace admin, can turn it on or off.');
+    }
+
+    const updated = await sourceService.setSourceActive(workspaceId, sourceId, isActive);
+    res.json(publicSource(updated));
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * summarizeSource — POST /workspaces/:workspaceId/sources/:sourceId/summarize
  */
 const summarizeSource = async (req, res, next) => {
@@ -224,4 +251,4 @@ const summarizeSource = async (req, res, next) => {
   }
 };
 
-module.exports = { listSources, getSource, uploadFile, addUrlSource, retrySource, deleteSource, summarizeSource };
+module.exports = { listSources, getSource, uploadFile, addUrlSource, retrySource, deleteSource, setSourceActive, summarizeSource };

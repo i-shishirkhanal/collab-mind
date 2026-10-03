@@ -80,15 +80,33 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  // `@AI <question>` (or the button on a refusal) sends that ONE question to the general model.
+  // Everything else is answered from the active workspace sources only.
+  const GENERAL_PREFIX = /^@ai(?=[\s,:]|$)[\s,:]*/i;
+
+  const handleSend = () => {
+    const text = input.trim();
+    if (!text || isLoading) return;
+    const prefixed = GENERAL_PREFIX.exec(text);
+    if (!prefixed) return submit(text, false);
+    const question = text.slice(prefixed[0].length).trim();
+    if (!question) {
+      setError("Type your question after @AI, for example: @AI what is a mutex?");
+      return;
+    }
+    submit(question, true);
+  };
+
+  const submit = async (content: string, general: boolean) => {
+    if (isLoading) return;
 
     const userMsg = {
       id: `local-${Date.now()}`,
       workspace_id: workspaceId,
       user_id: "local_user",
-      content: input.trim(),
+      content,
       role: 'user' as const,
+      ...(general ? { metadata: { mode: 'general' as const } } : {}),
       created_at: new Date().toISOString()
     };
 
@@ -108,7 +126,7 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
       // socket has already joined the workspace room. The REST response is authoritative, so use it
       // too; messages are merged by id, so receiving both is harmless.
       // History is read from the server-side conversation; nothing is sent from here.
-      const result = await sendChat(workspaceId, userMsg.content);
+      const result = await sendChat(workspaceId, userMsg.content, [], general ? 'general' : undefined);
       if (result?.userMessage) replaceMessage(userMsg.id, result.userMessage);
       if (result?.aiMessage) addMessage(result.aiMessage);
     } catch (err) {
@@ -158,8 +176,13 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
               </button>
             </div>
           )}
-          {messages.map((m) => (
-            <ChatMessage key={m.id} message={m} />
+          {messages.map((m, i) => (
+            <ChatMessage
+              key={m.id}
+              message={m}
+              precedingQuestion={i > 0 && messages[i - 1].role === 'user' ? messages[i - 1].content : undefined}
+              onAskGeneral={(question) => submit(question, true)}
+            />
           ))}
 
           {isLoading && (
@@ -221,7 +244,7 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
               typingStopTimer.current = setTimeout(() => sendTyping(false), 2000);
             }}
             onKeyDown={onKeyDown}
-            placeholder="Ask anything about your workspace sources... (Shift+Enter for newline)"
+            placeholder="Ask about your sources. Start with @AI for a one-off general question."
             className="w-full bg-slate-800 border border-slate-700 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 resize-none overflow-hidden custom-scrollbar transition-shadow shadow-sm"
             rows={1}
             style={{ minHeight: '56px', maxHeight: '120px' }}

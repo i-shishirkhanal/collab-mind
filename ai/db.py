@@ -43,6 +43,7 @@ async def get_pool() -> asyncpg.Pool:
 # schema; the service never runs DDL itself.
 _REQUIRED_COLUMNS = {
     "source_chunks": ("location_label", "embedding_model", "embedding_dim", "fts"),
+    "sources": ("is_active",),
     "agent_runs": ("finished_at",),
     "llm_usage": ("workspace_id", "total_tokens"),
 }

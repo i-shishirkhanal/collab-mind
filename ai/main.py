@@ -26,7 +26,7 @@ from db import get_pool, close_pool, ensure_schema
 from schemas import (
     EmbedRequest, EmbedResponse,
     SummarizeRequest, SummarizeResponse,
-    ChatRequest, ChatResponse, RouteInfo, UsageInfo,
+    ChatRequest, GeneralChatRequest, ChatResponse, RouteInfo, UsageInfo,
     StudyCoachRequest, StudyCoachResponse,
     AgentStatusResponse,
     FlashcardRequest, FlashcardsResponse,
@@ -36,7 +36,9 @@ from schemas import (
 )
 from rag.embedder import embed_source
 from rag.pipeline import RagResult, run_rag_pipeline, stream_rag_pipeline
-from rag import generator
+from rag import generator, grounding
+from rag.usage import record_usage
+from llm import get_router
 from agents.study_coach import StudyCoachAgent
 from agents.reaper import reaper_loop
 from agents.runner import run_study_coach_background
@@ -154,6 +156,28 @@ def _rag_kwargs(body: ChatRequest) -> dict:
 async def chat_endpoint(body: ChatRequest) -> ChatResponse:
     pool = await get_pool()
     return _to_response(await run_rag_pipeline(pool=pool, **_rag_kwargs(body)))
+
+
+@app.post("/chat/general", response_model=ChatResponse,
+          summary="Answer ONE question with the general model, outside the workspace sources")
+async def chat_general_endpoint(body: GeneralChatRequest) -> ChatResponse:
+    """Only reachable when the user explicitly asks for it. No retrieval and no conversation history,
+    so nothing from the documents or earlier turns mixes into the answer."""
+    pool = await get_pool()
+    completion = await get_router().complete(
+        Task.CHAT,
+        [{"role": "system", "content": grounding.GENERAL_SYSTEM_PROMPT},
+         {"role": "user", "content": body.message}],
+        temperature=0.3,
+    )
+    await record_usage(pool, workspace_id=body.workspace_id, user_id=body.user_id, kind="general_chat",
+                       task=Task.CHAT.value, route=completion.route, usage=completion.usage)
+    return ChatResponse(
+        answer=completion.text.strip(), citations=[], grounding="general",
+        warnings=["General AI answer. It is not based on your uploaded sources."],
+        task=Task.CHAT.value, route=RouteInfo(**completion.route.to_dict()),
+        usage=UsageInfo(**completion.usage.to_dict()),
+    )
 
 
 def _sse(event: str, data: dict) -> str:

@@ -156,7 +156,7 @@ def test_redirect_to_private_host_is_blocked_on_every_hop():
 
 
 @pytest.mark.parametrize("url", ["https://www.youtube.com/watch?v=abc", "https://youtu.be/abc"])
-def test_youtube_links_are_rejected_instead_of_indexing_page_html(url):
+def test_malformed_youtube_links_are_rejected_instead_of_indexing_page_html(url):
     with pytest.raises(ExtractionError, match="YouTube"):
         extract_url(url, host_check=lambda h: True)
 

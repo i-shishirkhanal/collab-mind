@@ -16,12 +16,25 @@ const OLE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 
 // Binary formats: magic bytes. PDF readers tolerate junk before the header, so
 // "%PDF-" may appear anywhere in the first KB; the rest must start with it.
+const isTiff = (b) => {
+  const head = [...b.subarray(0, 4)];
+  return (head[0] === 0x49 && head[1] === 0x49 && head[2] === 0x2a && head[3] === 0x00)
+      || (head[0] === 0x4d && head[1] === 0x4d && head[2] === 0x00 && head[3] === 0x2a);
+};
+
 const BINARY_FORMATS = {
   '.pdf':  { label: 'PDF',        matches: (b) => b.subarray(0, 1024).includes('%PDF-') },
   '.docx': { label: 'Word',       matches: (b) => b.subarray(0, 4).equals(ZIP) },
   '.pptx': { label: 'PowerPoint', matches: (b) => b.subarray(0, 4).equals(ZIP) },
   '.xlsx': { label: 'Excel',      matches: (b) => b.subarray(0, 4).equals(ZIP) },
   '.xls':  { label: 'Excel',      matches: (b) => b.subarray(0, 8).equals(OLE) },
+  '.png':  { label: 'PNG image',  matches: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  '.jpg':  { label: 'JPEG image', matches: (b) => b.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) },
+  '.jpeg': { label: 'JPEG image', matches: (b) => b.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) },
+  '.webp': { label: 'WebP image', matches: (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
+  '.bmp':  { label: 'BMP image',  matches: (b) => b.subarray(0, 2).toString('latin1') === 'BM' },
+  '.tif':  { label: 'TIFF image', matches: (b) => isTiff(b) },
+  '.tiff': { label: 'TIFF image', matches: (b) => isTiff(b) },
 };
 
 // Text formats must be text: a NUL byte in the head means a binary file with a

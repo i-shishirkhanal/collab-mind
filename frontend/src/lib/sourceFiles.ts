@@ -4,6 +4,7 @@
 export const ALLOWED_EXTENSIONS = [
   ".pdf", ".docx", ".pptx", ".xlsx", ".xls",
   ".txt", ".md", ".csv", ".html", ".htm", ".json",
+  ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff",
 ];
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 

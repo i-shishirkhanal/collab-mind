@@ -55,6 +55,7 @@ export interface Source {
   name: string;
   type: string;
   status: 'processing' | 'ready' | 'failed';
+  is_active?: boolean; // false = switched off for chat, Studio and agents
   metadata?: SourceMetadata | null;
   created_by?: string;
   uploaded_by?: string;
@@ -89,7 +90,9 @@ export interface ChatMessage {
 export interface ChatMessageMetadata {
   citations?: Citation[];
   // grounded | uncited (answer cites no source) | no_answer | no_sources
-  grounding?: 'grounded' | 'uncited' | 'no_answer' | 'no_sources' | null;
+  grounding?: 'grounded' | 'uncited' | 'no_answer' | 'no_sources' | 'general' | null;
+  // 'general' = answered by the general model on request, not from the workspace sources
+  mode?: 'sources' | 'general';
   warnings?: string[];
   task?: 'chat' | 'study' | 'research' | null;
   model?: { provider: string; tier: 'flash' | 'pro'; model_used: string; fallback_used: boolean } | null;

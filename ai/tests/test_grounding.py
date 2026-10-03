@@ -59,7 +59,8 @@ def test_prompt_numbers_passages_and_keeps_them_in_the_user_turn():
     assert "[1] Source: biology.pdf | Page 3" in user and "[2] Source: cells.docx | Section: Energy" in user
     assert "[3] Source: notes.txt\n" in user
     assert "What absorbs red light?" in user
-    assert NO_ANSWER in msgs[0]["content"] and "Beyond your sources:" in msgs[0]["content"]
+    assert NO_ANSWER in msgs[0]["content"]
+    assert "Beyond your sources" not in msgs[0]["content"]  # no outside-knowledge escape hatch
 
 
 def test_injected_instructions_in_documents_stay_out_of_the_system_prompt():

@@ -125,6 +125,9 @@ export const addUrl = addUrlSource;
 export const retrySource = (workspaceId: string, sourceId: string) =>
   apiCall(`/api/workspaces/${workspaceId}/sources/${sourceId}/retry`, { method: 'POST' });
 
+export const setSourceActive = (workspaceId: string, sourceId: string, isActive: boolean) =>
+  apiCall(`/api/workspaces/${workspaceId}/sources/${sourceId}`, { method: 'PATCH', body: JSON.stringify({ is_active: isActive }) });
+
 export const deleteSource = (workspaceId: string, sourceId: string) =>
   apiCall(`/api/workspaces/${workspaceId}/sources/${sourceId}`, { method: 'DELETE' });
 
@@ -148,8 +151,16 @@ export const removeMember = (workspaceId: string, userId: string) =>
 
 // Chat API
 export const CHAT_PAGE_SIZE = 50;
-export const sendChatMessage = (workspaceId: string, message: string, conversation_history: unknown[] = []) => 
-  apiCall(`/api/workspaces/${workspaceId}/chat`, { method: 'POST', body: JSON.stringify({ message, conversation_history }) });
+export const sendChatMessage = (
+  workspaceId: string,
+  message: string,
+  conversation_history: unknown[] = [],
+  mode?: 'general',
+) =>
+  apiCall(`/api/workspaces/${workspaceId}/chat`, {
+    method: 'POST',
+    body: JSON.stringify({ message, conversation_history, ...(mode ? { mode } : {}) }),
+  });
 
 export const sendChat = sendChatMessage;
 

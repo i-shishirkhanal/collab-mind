@@ -17,6 +17,12 @@ from typing import Optional
 from schemas import Citation
 
 NO_ANSWER = "I could not find an answer in your workspace sources."
+
+GENERAL_SYSTEM_PROMPT = (
+    "You are a general-purpose assistant answering ONE question that the user explicitly sent outside "
+    "their uploaded documents. You have no access to those documents here. Answer briefly and clearly. "
+    "If you are unsure, say so rather than guessing."
+)
 MAX_HISTORY_TURNS = 10
 MAX_HISTORY_CHARS = 6000
 EXCERPT_CHARS = 280
@@ -44,7 +50,7 @@ RULES
 2. After each sentence that relies on a passage, add its number in square brackets, e.g. "Chlorophyll absorbs red light [2]." Use several numbers when needed: [1][3]. Only use numbers that exist. Never write a page number, quotation or source name that is not in the passage text.
 3. If the passages do not contain the answer, reply with exactly: {NO_ANSWER}
 4. If the passages only partly answer the question, answer the supported part, then say plainly which part the sources do not cover.
-5. If you add reasoning, interpretation or background that is NOT stated in the passages, put it in a final paragraph that starts with "Beyond your sources:" and do not cite it. Say so when you are unsure.
+5. Never add outside knowledge, background, interpretation or guesses, even labelled as such. Every sentence must be supported by a passage and carry its number.
 6. Be concise. Use the conversation history only to understand follow-up questions (e.g. what "it" refers to); facts still must come from the passages."""
 
 _MARKER_GROUP = re.compile(r"\[(\d+(?:\s*[,;]\s*\d+)*)\]")

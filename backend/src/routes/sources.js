@@ -43,6 +43,11 @@ router.get('/:workspaceId/sources/:sourceId', ...guardSource, sourceController.g
 router.delete('/:workspaceId/sources/:sourceId', ...guardSource, sourceController.deleteSource);
 
 /**
+ * PATCH /workspaces/:workspaceId/sources/:sourceId   { is_active }
+ */
+router.patch('/:workspaceId/sources/:sourceId', ...guardSource, sourceController.setSourceActive);
+
+/**
  * POST /workspaces/:workspaceId/sources/:sourceId/retry
  */
 router.post('/:workspaceId/sources/:sourceId/retry', authenticate, ingestLimit, requireUuidParams('workspaceId', 'sourceId'), requireWorkspaceMember, sourceController.retrySource);

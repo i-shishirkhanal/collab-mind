@@ -57,6 +57,13 @@ class ChatRequest(BaseModel):
     task: Optional[Literal["chat", "study", "research"]] = None
 
 
+class GeneralChatRequest(BaseModel):
+    """One question sent to the general model on purpose. No documents, no history."""
+    workspace_id: Id
+    message: Annotated[str, Field(min_length=1, max_length=8000)]
+    user_id: Optional[Id] = None
+
+
 class Citation(BaseModel):
     # `index` is the [n] marker used in the answer text. Everything else is
     # copied from the retrieved chunk, never from model output.
@@ -91,7 +98,7 @@ class UsageInfo(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     citations: list[Citation]
-    # grounded | uncited | no_sources | no_answer
+    # grounded | uncited | no_sources | no_answer | general
     grounding: str = "grounded"
     warnings: list[str] = []
     task: Optional[str] = None

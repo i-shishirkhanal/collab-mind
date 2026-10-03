@@ -4,7 +4,7 @@ full-text search.
 
 Guarantees:
   * every query is filtered by `workspace_id` in SQL (never post-filtered), and
-    only sources with status = 'ready' are searched;
+    only sources with status = 'ready' that are switched on (is_active) are searched;
   * the query vector comes from the same BGE-M3 client/config as the indexed
     chunks — if embeddings are unavailable this raises
     EmbeddingUnavailableError instead of searching with a substitute;
@@ -37,6 +37,7 @@ _SCOPE = """
     {extra_from}
     WHERE sc.workspace_id = $1
       AND s.status = 'ready'
+      AND s.is_active
       AND ($4::uuid[] IS NULL OR sc.source_id = ANY($4::uuid[]))
       AND ($5::text[] IS NULL OR s.type = ANY($5::text[]))
 """
@@ -150,7 +151,7 @@ async def sample_chunks(
                        COUNT(*)     OVER (PARTITION BY sc.source_id) AS total
                 FROM source_chunks sc
                 JOIN sources s ON s.id = sc.source_id AND s.workspace_id = sc.workspace_id
-                WHERE sc.workspace_id = $1 AND s.status = 'ready'
+                WHERE sc.workspace_id = $1 AND s.status = 'ready' AND s.is_active
                   AND ($3::uuid[] IS NULL OR sc.source_id = ANY($3::uuid[]))
             ) t
             ORDER BY (rn::float / total), source_id, chunk_index

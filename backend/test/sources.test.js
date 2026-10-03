@@ -60,6 +60,12 @@ const poolStub = {
       const [row] = sources.splice(i, 1);
       return { rows: [{ id: row.id, url: row.url, type: row.type }] };
     }
+    if (sql.startsWith('UPDATE sources SET is_active')) { // setSourceActive
+      const s = sources.find((x) => x.id === params[0] && x.workspace_id === params[1]);
+      if (!s) return { rows: [] };
+      s.is_active = params[2];
+      return { rows: [s] };
+    }
     if (sql.startsWith("UPDATE sources SET status = 'processing'")) { // beginRetry
       const s = sources.find((x) => x.id === params[0] && x.workspace_id === params[1]);
       if (!s || s.status !== 'failed') return { rows: [] };
@@ -131,7 +137,11 @@ const upload = (user, workspace, { name, content, type = 'application/octet-stre
   form.append('file', new Blob([content], { type }), name);
   return fetch(`${base}/${workspace}/sources/upload`, { method: 'POST', headers: user ? { 'x-test-user': user } : {}, body: form });
 };
-const call = (user, method, url) => fetch(`${base}${url}`, { method, headers: user ? { 'x-test-user': user } : {} });
+const call = (user, method, url, body) => fetch(`${base}${url}`, {
+  method,
+  headers: { ...(user ? { 'x-test-user': user } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
+  ...(body ? { body: JSON.stringify(body) } : {}),
+});
 const storedFiles = () => {
   const out = [];
   const walk = (d) => fs.existsSync(d) && fs.readdirSync(d, { withFileTypes: true }).forEach((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : out.push(path.join(d, e.name))));
@@ -296,6 +306,29 @@ test('the creator can delete their source and its stored file is removed', async
   assert.equal((await call(BOB, 'DELETE', `/${WS_A}/sources/${source_id}`)).status, 204);
   assert.equal(sources.length, 0);
   assert.deepEqual(storedFiles(), []);
+});
+
+test('a member cannot switch off a source someone else added', async () => {
+  const s = seed({ created_by: ALICE });
+  const res = await call(BOB, 'PATCH', `/${WS_A}/sources/${s.id}`, { is_active: false });
+  assert.equal(res.status, 403);
+  assert.notEqual(s.is_active, false);
+});
+
+test('the creator and workspace admins can switch a source off and on', async () => {
+  const s = seed({ created_by: BOB });
+  for (const [user, value] of [[BOB, false], [CAROL, true], [ALICE, false]]) {
+    const res = await call(user, 'PATCH', `/${WS_A}/sources/${s.id}`, { is_active: value });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).is_active, value);
+  }
+});
+
+test('switching a source needs a real boolean and an existing source', async () => {
+  const s = seed({ created_by: BOB });
+  assert.equal((await call(BOB, 'PATCH', `/${WS_A}/sources/${s.id}`, { is_active: 'no' })).status, 400);
+  assert.equal((await call(BOB, 'PATCH', `/${WS_A}/sources/${s.id}`, {})).status, 400);
+  assert.equal((await call(BOB, 'PATCH', `/${WS_A}/sources/99999999-9999-4999-8999-999999999999`, { is_active: true })).status, 404);
 });
 
 test('workspace admins and owners can delete any source', async () => {

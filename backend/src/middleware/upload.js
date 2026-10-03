@@ -12,6 +12,8 @@ const storage = multer.memoryStorage();
 const ALLOWED_EXTENSIONS = [
   '.pdf', '.docx', '.pptx', '.xlsx', '.xls',
   '.txt', '.md', '.csv', '.html', '.htm', '.json',
+  // images, read with OCR by the AI service
+  '.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff',
 ];
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;

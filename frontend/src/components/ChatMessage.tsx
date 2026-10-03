@@ -1,17 +1,20 @@
 "use client";
 
 import { useChatStore } from "@/lib/store";
-import { ChatMessage as ChatMessageType, Citation } from "@/types";
-import { citationForMarker } from "@/lib/citations";
-import React from "react";
+import { ChatMessage as ChatMessageType } from "@/types";
+import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  /** The question this answer replied to; lets a refusal offer a one-off general-AI answer. */
+  precedingQuestion?: string;
+  onAskGeneral?: (question: string) => void;
 }
 
 const NOT_FOUND_MESSAGE = "I could not find an answer in your workspace sources.";
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, precedingQuestion, onAskGeneral }: ChatMessageProps) {
   const isUser = message.role === "user";
   const citations = message.metadata?.citations ?? message.citations ?? [];
   const grounding = message.metadata?.grounding ?? null;
@@ -22,50 +25,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
   );
   // The model's answer used no source passage at all: say so instead of implying it is sourced.
   const isUncited = !isUser && !isUngrounded && grounding === 'uncited';
+  const isGeneral = message.metadata?.mode === 'general' || grounding === 'general';
 
-  // [n] in the text is the passage number the server assigned (citation.index). Only the
-  // cited passages are returned, in order of first use, so the array position is NOT n.
-  // Messages stored before this field existed fall back to position.
-  const citationFor = (n: number): Citation | null => citationForMarker(citations, n);
+  const [showSources, setShowSources] = useState(false);
 
-  // Parse inline citations like [1], [2]
-  const parseInlineCitations = (text: string) => {
-    const citationRegex = /\[(\d+)\]/g;
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = citationRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(text.substring(lastIndex, match.index));
-      }
-
-      const numStr = match[1];
-      const citation = citationFor(parseInt(numStr, 10));
-
-      if (citation) {
-         parts.push(
-          <span 
-            key={match.index}
-            onClick={() => setActiveCitation(citation)}
-            className="inline-flex items-center justify-center px-1.5 mx-0.5 rounded cursor-pointer text-[10px] font-bold bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 hover:text-indigo-300 transition-colors align-super border border-indigo-500/20"
-          >
-            {numStr}
-          </span>
-        );
-      } else {
-        parts.push(<span key={match.index} className="text-indigo-400">[{numStr}]</span>);
-      }
-
-      lastIndex = citationRegex.lastIndex;
-    }
-
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-
-    return parts;
-  };
+  // Citations stay attached to the message but are not shown inline: the [n] markers the model
+  // writes are stripped from the text, and the eye button below reveals what they pointed at.
+  const stripMarkers = (text: string) =>
+    text.replace(/\s*\[\d+(?:\s*[,;]\s*\d+)*\]/g, "").replace(/ +([.,;:!?])/g, "$1");
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6 group`}>
@@ -88,9 +55,29 @@ export function ChatMessage({ message }: ChatMessageProps) {
               ? "bg-slate-800/60 border border-dashed border-slate-600 text-slate-400 rounded-tl-sm italic"
               : "bg-slate-800 border border-slate-700/50 text-slate-200 rounded-tl-sm"
         }`}>
+          {isGeneral && (
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400 not-italic">
+              General AI{isUser ? "" : " · not from your sources"}
+            </div>
+          )}
           <div className="whitespace-pre-wrap">
-            {isUser ? message.content : parseInlineCitations(message.content)}
+            {isUser ? message.content : stripMarkers(message.content)}
           </div>
+
+          {isUngrounded && onAskGeneral && precedingQuestion && (
+            <div className="mt-3 pt-3 border-t border-slate-600/50 not-italic">
+              <button
+                type="button"
+                onClick={() => onAskGeneral(precedingQuestion)}
+                className="rounded-full border border-indigo-500/40 px-3 py-1 text-xs font-medium text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+              >
+                Ask general AI this question
+              </button>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Answers just this one question outside your uploaded sources.
+              </p>
+            </div>
+          )}
 
           {isUncited && (
             <div className="mt-2.5 pt-2.5 border-t border-amber-500/30 text-[11px] text-amber-400/90 not-italic">
@@ -103,9 +90,36 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
 
           {!isUser && !isUngrounded && citations.length > 0 && (
-            <div className="mt-2.5 pt-2.5 border-t border-slate-700/50 flex items-center gap-1.5 text-[11px] text-indigo-400/90 not-italic">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/70" />
-              Grounded in {citations.length} source{citations.length > 1 ? "s" : ""}
+            <div className="mt-2.5 pt-2.5 border-t border-slate-700/50 not-italic">
+              <button
+                type="button"
+                onClick={() => setShowSources(v => !v)}
+                aria-expanded={showSources}
+                aria-label={showSources ? "Hide sources" : "Show sources"}
+                title={showSources ? "Hide sources" : "Show sources"}
+                className="flex items-center gap-1.5 text-[11px] text-indigo-400/90 hover:text-indigo-300 transition-colors"
+              >
+                {showSources ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {citations.length} source{citations.length > 1 ? "s" : ""}
+              </button>
+              {showSources && (
+                <ul className="mt-2 space-y-1.5">
+                  {citations.map((c, i) => (
+                    <li key={`${c.source_id ?? c.source_name}-${c.chunk_index}-${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveCitation(c)}
+                        className="w-full text-left rounded-lg bg-slate-900/60 border border-slate-700/50 px-3 py-2 text-xs hover:border-indigo-500/40 transition-colors"
+                      >
+                        <span className="block font-medium text-slate-200 break-words">{c.source_name}</span>
+                        {(c.location_label || c.page_number) && (
+                          <span className="block text-[11px] text-slate-400">{c.location_label ?? `Page ${c.page_number}`}</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

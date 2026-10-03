@@ -164,3 +164,27 @@ test('stream that ends without a result is a 502, not a hang or a fabricated ans
   const { chatService } = setup({ aiStream: async () => ({ data: sse(['delta', { text: 'part' }]) }) });
   await assert.rejects(chatService.sendChatMessage('ws-1', 'u', 'q', [], { onDelta() {} }), (e) => e.status === 502);
 });
+
+test('general mode sends only the one question to /chat/general, with no history, and tags both messages', async () => {
+  const { chatService, calls, log } = setup({
+    aiPost: async () => ({ data: { answer: 'A mutex is a lock.', citations: [], grounding: 'general', warnings: [], task: 'chat' } }),
+    historyRows: [{ role: 'user', content: 'What is ATP?' }],
+  });
+  const { aiMessage } = await chatService.sendChatMessage('w1', 'u1', 'What is a mutex?', [], { mode: 'general' });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].p, '/chat/general');
+  assert.deepEqual(calls[0].data, { workspace_id: 'w1', message: 'What is a mutex?', user_id: 'u1' });
+  assert.equal(aiMessage.metadata.mode, 'general');
+  assert.equal(aiMessage.metadata.grounding, 'general');
+  assert.deepEqual(aiMessage.metadata.citations, []);
+  const userInsert = log.queries.find((q) => /INSERT INTO chat_messages/.test(q.sql) && /'user'/.test(q.sql));
+  assert.equal(userInsert.params[3], JSON.stringify({ mode: 'general' }));
+});
+
+test('history for grounded answers leaves out general-mode messages', async () => {
+  const { chatService, log } = setup({ aiPost: async () => ({ data: AI_OK }) });
+  await chatService.sendChatMessage('w1', 'u1', 'What does the paper say?');
+  const historyQuery = log.queries.find((q) => /SELECT role, content FROM chat_messages/.test(q.sql));
+  assert.match(historyQuery.sql, /metadata->>'mode'.*<> 'general'/);
+});

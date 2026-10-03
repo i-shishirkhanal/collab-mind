@@ -50,6 +50,7 @@ const loadHistory = async (client, workspaceId) => {
   const { rows } = await client.query(
     `SELECT role, content FROM chat_messages
       WHERE workspace_id = $1 AND role IN ('user', 'assistant')
+        AND COALESCE(metadata->>'mode', '') <> 'general'
       ORDER BY created_at DESC LIMIT $2`,
     [workspaceId, HISTORY_LIMIT],
   );
@@ -94,6 +95,7 @@ const buildAiPayload = (workspaceId, userId, message, history, options) => ({
 const buildMetadata = (ai) => ({
   citations: ai.citations || [],
   grounding: ai.grounding || null,
+  mode: ai.grounding === 'general' ? 'general' : 'sources',
   warnings: ai.warnings || [],
   task: ai.task || null,
   model: ai.route || null,   // provider, tier, model_requested, model_used, fallback_used, attempts ...
@@ -158,7 +160,10 @@ const streamFromAi = async (payload, onDelta) => {
  * @param {string} message
  * @param {Array}  [conversation_history]
  * @param {Object} [options]  - { sourceIds?: string[], task?: 'chat'|'study'|'research',
- *                                 onDelta?: (text) => void }  onDelta switches to streaming
+ *                                 mode?: 'general', onDelta?: (text) => void }
+ *                                 onDelta switches to streaming. mode 'general' sends this ONE
+ *                                 question to the general model (no sources, no history) and keeps
+ *                                 both messages out of the history later grounded answers see.
  * @returns {Promise<Object>}   - { userMessage, aiMessage }
  */
 const sendChatMessage = async (workspaceId, userId, message, conversation_history = [], options = {}) => {
@@ -168,6 +173,8 @@ const sendChatMessage = async (workspaceId, userId, message, conversation_histor
   // assistant/system turns to steer the model).
   void conversation_history;
   const askedAt = new Date();
+
+  const general = options.mode === 'general';
 
   // 1. Read history on a short-lived connection. No connection or transaction is
   //    held while the (slow) model call runs, so concurrent chats cannot exhaust the pool.
@@ -182,10 +189,18 @@ const sendChatMessage = async (workspaceId, userId, message, conversation_histor
   // 2. Ask the AI service
   let ai;
   try {
-    const payload = buildAiPayload(workspaceId, userId, message, history, options);
-    ai = options.onDelta
-      ? await streamFromAi(payload, options.onDelta)
-      : (await aiClient.post('/chat', payload, { timeout: AI_TIMEOUT_MS })).data;
+    if (general) {
+      ai = (await aiClient.post(
+        '/chat/general',
+        { workspace_id: workspaceId, message, user_id: userId },
+        { timeout: AI_TIMEOUT_MS },
+      )).data;
+    } else {
+      const payload = buildAiPayload(workspaceId, userId, message, history, options);
+      ai = options.onDelta
+        ? await streamFromAi(payload, options.onDelta)
+        : (await aiClient.post('/chat', payload, { timeout: AI_TIMEOUT_MS })).data;
+    }
   } catch (aiErr) {
     // Nothing was stored: a question whose answer failed is not kept.
     throw aiErr.mapped ? aiErr : await mapAiError(aiErr);
@@ -198,10 +213,10 @@ const sendChatMessage = async (workspaceId, userId, message, conversation_histor
   try {
     await client.query('BEGIN');
     const { rows: userMsgRows } = await client.query(
-      `INSERT INTO chat_messages (workspace_id, user_id, role, content, created_at)
-            VALUES ($1, $2, 'user', $3, $4)
+      `INSERT INTO chat_messages (workspace_id, user_id, role, content, metadata, created_at)
+            VALUES ($1, $2, 'user', $3, $4, $5)
          RETURNING *`,
-      [workspaceId, userId, message, askedAt],
+      [workspaceId, userId, message, general ? JSON.stringify({ mode: 'general' }) : null, askedAt],
     );
     userMessage = userMsgRows[0];
     const { rows: aiMsgRows } = await client.query(

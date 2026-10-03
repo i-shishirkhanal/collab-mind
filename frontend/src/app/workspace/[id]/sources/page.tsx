@@ -6,7 +6,7 @@ import { SourceUploader } from "@/components/SourceUploader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Database, Trash2, Globe, Sparkles, Loader2, X, Copy, Check } from "lucide-react";
-import { getSources, summarizeSource, retrySource, deleteSource } from "@/lib/api";
+import { getSources, summarizeSource, retrySource, deleteSource, setSourceActive } from "@/lib/api";
 import { STAGE_LABELS } from "@/lib/sourceFiles";
 import { RotateCw } from "lucide-react";
 
@@ -103,6 +103,19 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
     }
   };
 
+  const handleToggle = async (sourceId: string, next: boolean) => {
+    setBusyId(sourceId);
+    setActionError(null);
+    try {
+      await setSourceActive(id, sourceId, next);
+      await refreshSources();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not change this source.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleDelete = async (sourceId: string, name: string) => {
     if (!window.confirm(`Delete "${name}"? Its indexed content will be removed from this workspace.`)) return;
     setBusyId(sourceId);
@@ -178,7 +191,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
                   </thead>
                   <tbody className="divide-y divide-slate-800/50 text-sm">
                     {sources.map(source => (
-                      <tr key={source.id} className="hover:bg-slate-800/30 transition-colors group">
+                      <tr key={source.id} className={`hover:bg-slate-800/30 transition-colors group ${source.is_active === false ? "opacity-60" : ""}`}>
                         <td className="px-6 py-4 text-slate-200 font-medium">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded shrink-0 bg-slate-800 flex items-center justify-center border border-slate-700">
@@ -205,6 +218,18 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={source.is_active !== false}
+                              aria-label={`${source.is_active === false ? "Turn on" : "Turn off"} ${source.name}`}
+                              title={source.is_active === false ? "Off: ignored by chat, Studio and agents" : "On: used for answers"}
+                              disabled={busyId === source.id}
+                              onClick={() => handleToggle(source.id, source.is_active === false)}
+                              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${source.is_active === false ? "bg-slate-600" : "bg-indigo-600"}`}
+                            >
+                              <span className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform ${source.is_active === false ? "" : "translate-x-5"}`} />
+                            </button>
                             <Button 
                               variant="outline" 
                               size="sm"
