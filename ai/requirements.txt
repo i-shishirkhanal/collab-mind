@@ -4,7 +4,7 @@
 # release. For fully reproducible images generate a hashed lock: pip-compile --generate-hashes.
 
 # ── Web framework ──────────────────────────────────────────────────────────────
-fastapi>=0.141.1,<1  # The web framework
+fastapi>=0.142.2,<1  # The web framework
 uvicorn[standard]>=0.40.0,<1  # ASGI server that runs FastAPI (like Node's Express server)
 
 # ── Database ───────────────────────────────────────────────────────────────────
