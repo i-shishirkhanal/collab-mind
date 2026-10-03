@@ -5,7 +5,7 @@
 
 # ── Web framework ──────────────────────────────────────────────────────────────
 fastapi>=0.141.1,<1  # The web framework
-uvicorn[standard]>=0.40.0,<1  # ASGI server that runs FastAPI (like Node's Express server)
+uvicorn[standard]>=0.54.0,<1  # ASGI server that runs FastAPI (like Node's Express server)
 
 # ── Database ───────────────────────────────────────────────────────────────────
 asyncpg>=0.31.0,<1  # Async PostgreSQL driver — much faster than psycopg2 for async code
