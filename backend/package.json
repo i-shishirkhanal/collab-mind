@@ -9,7 +9,7 @@
     "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.19.0",
+    "@google-cloud/storage": "^8.2.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.6.7",
     "cors": "^2.8.5",
