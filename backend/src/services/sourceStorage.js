@@ -52,7 +52,10 @@ const post = (objectPath, buffer, mimeType) => {
 /** @returns {Promise<string>} supabase://sources/<objectPath> */
 const upload = async (objectPath, buffer, mimeType) => {
   let res = await post(objectPath, buffer, mimeType);
-  if (res.status === 404) { // bucket missing: create it once, then retry
+  // Supabase reports a missing bucket as HTTP 400 with statusCode 404 in the body.
+  const bucketMissing = async (r) => r.status === 404
+    || (r.status === 400 && /NoSuchBucket|Bucket not found/i.test(await r.clone().text().catch(() => '')));
+  if (!res.ok && await bucketMissing(res)) { // bucket missing: create it once, then retry
     try {
       await ensureBucket();
     } catch (err) {
