@@ -30,7 +30,7 @@ function VerifyEmail() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-center text-slate-200">
       <div className="w-full max-w-[420px] space-y-4 rounded-2xl border border-slate-800 bg-slate-900/90 p-8">
-        <h1 className="font-serif text-2xl text-white">
+        <h1 className="font-serif text-2xl text-slate-50">
           {state === "working" ? "Verifying…" : state === "ok" ? "Email verified" : "Link not valid"}
         </h1>
         <p className="text-sm text-slate-400">

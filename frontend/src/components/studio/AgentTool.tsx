@@ -90,7 +90,7 @@ export function AgentTool({ workspaceId }: { workspaceId: string }) {
             <Zap className="w-5 h-5 text-purple-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Study Coach Agent</h2>
+            <h2 className="text-xl font-semibold text-slate-50">Study Coach Agent</h2>
             <p className="text-xs text-slate-500">Autonomous multi-step learning planner</p>
           </div>
         </div>

@@ -53,7 +53,7 @@ export function UserPicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search teammates by name or email"
           aria-label="Search people"
-          className="pl-8 h-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+          className="pl-8 h-9 bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
         />
       </div>
       <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-800 divide-y divide-slate-800/70" role="listbox" aria-label="People">

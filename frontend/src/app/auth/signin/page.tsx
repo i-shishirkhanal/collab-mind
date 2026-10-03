@@ -11,7 +11,7 @@ import { Loader2, Mail, Lock, User, AlertCircle, ArrowRight, CheckCircle2 } from
 import { registerAccount, resendVerification } from "@/lib/authApi";
 
 const inputClass =
-  "w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors";
+  "w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-50 placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors";
 
 // NextAuth surfaces the error code of a thrown CredentialsSignin as `code`.
 const SIGN_IN_ERRORS: Record<string, string> = {
@@ -93,7 +93,7 @@ export default function SignIn() {
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-inner">
             <span className="text-indigo-400 font-bold text-2xl tracking-tighter">CM</span>
           </div>
-          <h1 className="text-2xl font-serif font-semibold tracking-tight text-white">
+          <h1 className="text-2xl font-serif font-semibold tracking-tight text-slate-50">
             {isSignUp ? "Create an account" : "Welcome back"}
           </h1>
           <p className="text-sm text-slate-400">

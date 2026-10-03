@@ -7,19 +7,13 @@ import {
   ArrowRight, 
   FileText, 
   Brain, 
-  Users, 
-  Zap, 
+  Users,  
   BookOpen, 
-  CheckCircle2, 
-  Layers, 
-  Bot, 
-  ShieldCheck, 
+  CheckCircle2,  
+  Bot,  
   HelpCircle,
   MessageSquare,
   Search,
-  Code2,
-  ChevronRight,
-  Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -27,7 +21,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"rag" | "studio" | "agent" | "collab">("rag");
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-transparent text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden">
+      <div className="watermark" aria-hidden>CollabMind</div>
       {/* Background Decorative Glow Effects */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-indigo-600/20 via-indigo-600/10 to-transparent blur-[140px] pointer-events-none rounded-full" />
       <div className="absolute top-96 left-[-100px] w-[500px] h-[500px] bg-indigo-600/10 blur-[160px] pointer-events-none rounded-full" />
@@ -44,22 +39,22 @@ export default function Home() {
               CM
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-xl tracking-tight text-white flex items-center gap-2">
+              <span className="font-bold text-xl tracking-tight text-slate-50 flex items-center gap-2">
                 CollabMind <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-semibold">AI</span>
               </span>
             </div>
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
-            <a href="#studio" className="hover:text-white transition-colors">Studio Tools</a>
-            <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
+            <a href="#features" className="hover:text-slate-50 transition-colors">Features</a>
+            <a href="#how-it-works" className="hover:text-slate-50 transition-colors">How it Works</a>
+            <a href="#studio" className="hover:text-slate-50 transition-colors">Studio Tools</a>
+            <a href="#faq" className="hover:text-slate-50 transition-colors">FAQ</a>
           </nav>
 
           <div className="flex items-center gap-4">
             <Link href="/auth/signin">
-              <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-800">
+              <Button variant="ghost" className="text-slate-300 hover:text-slate-50 hover:bg-slate-800">
                 Sign In
               </Button>
             </Link>
@@ -84,7 +79,7 @@ export default function Home() {
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-semibold tracking-tight text-white leading-[1.1]">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-semibold tracking-tight text-slate-50 leading-[1.1]">
             Turn raw documents into workspaces your whole team can reason with
           </h1>
 
@@ -102,7 +97,7 @@ export default function Home() {
               </Button>
             </Link>
             <a href="#how-it-works" className="w-full sm:w-auto">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white h-13 px-8 rounded-2xl text-base transition-all backdrop-blur-md">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-slate-50 h-13 px-8 rounded-2xl text-base transition-all backdrop-blur-md">
                 Explore Demo Workflow
               </Button>
             </a>
@@ -160,7 +155,7 @@ export default function Home() {
                 <div className="space-y-2">
                   <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center justify-between">
                     <div className="truncate">
-                      <p className="text-white font-medium truncate">Architecture_Spec_v2.pdf</p>
+                      <p className="text-slate-50 font-medium truncate">Architecture_Spec_v2.pdf</p>
                       <p className="text-slate-500 text-[10px]">14 chunks • Vector embeddings synced</p>
                     </div>
                     <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded">RAG</span>
@@ -168,7 +163,7 @@ export default function Home() {
 
                   <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center justify-between">
                     <div className="truncate">
-                      <p className="text-white font-medium truncate">Postgres_pgvector_Guide.md</p>
+                      <p className="text-slate-50 font-medium truncate">Postgres_pgvector_Guide.md</p>
                       <p className="text-slate-500 text-[10px]">8 chunks • Cosine similarity index</p>
                     </div>
                     <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded">RAG</span>
@@ -221,7 +216,7 @@ export default function Home() {
                     <span>FLASHCARD #1</span>
                     <span className="text-indigo-400">Click to Flip</span>
                   </div>
-                  <p className="text-xs text-white font-medium">What is the primary benefit of HNSW index over IVFFlat in pgvector?</p>
+                  <p className="text-xs text-slate-50 font-medium">What is the primary benefit of HNSW index over IVFFlat in pgvector?</p>
                   <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
                     Answer: Higher recall performance on high-dimensional vectors without full table scans.
                   </p>
@@ -238,7 +233,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto space-y-12">
           
           <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <h3 className="text-3xl md:text-4xl font-serif font-semibold text-white tracking-tight">
+            <h3 className="text-3xl md:text-4xl font-serif font-semibold text-slate-50 tracking-tight">
               One workspace for your entire research lifecycle
             </h3>
             <p className="text-slate-400 text-sm">
@@ -256,11 +251,11 @@ export default function Home() {
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-semibold transition-all border ${
                   activeTab === tab.id
                     ? "bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/25"
-                    : "bg-slate-900/60 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800"
+                    : "bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-50 hover:bg-slate-800"
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -277,7 +272,7 @@ export default function Home() {
                   <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
                     pgvector + Gemini RAG
                   </span>
-                  <h4 className="text-2xl font-bold text-white">Semantic Search with Source Grounding</h4>
+                  <h4 className="text-2xl font-bold text-slate-50">Semantic Search with Source Grounding</h4>
                   <p className="text-slate-400 text-sm leading-relaxed">
                     Upload documents or web links. CollabMind chunks files, generates vector embeddings, and stores them in PostgreSQL with pgvector for instant vector similarity retrieval. Every AI response includes exact file citations.
                   </p>
@@ -303,7 +298,7 @@ export default function Home() {
                   </div>
                   <div className="p-3 bg-slate-900 rounded-xl text-slate-300 border border-slate-800 text-[11px]">
                     <span className="text-amber-400 font-semibold block mb-1">[Match 0.94] System_Architecture.pdf:</span>
-                    "The API gateway proxies all websocket events to Redis PubSub for horizontal scalability across clusters."
+                    &ldquo;The API gateway proxies all websocket events to Redis PubSub for horizontal scalability across clusters.&rdquo;
                   </div>
                 </div>
               </div>
@@ -315,7 +310,7 @@ export default function Home() {
                   <span className="text-xs font-mono text-teal-400 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
                     Automated Study Artifacts
                   </span>
-                  <h4 className="text-2xl font-bold text-white">Generate Quizzes, Flashcards & Study Guides</h4>
+                  <h4 className="text-2xl font-bold text-slate-50">Generate Quizzes, Flashcards & Study Guides</h4>
                   <p className="text-slate-400 text-sm leading-relaxed">
                     Transform long technical documentation into active recall flashcards, multiple-choice quizzes with explanations, structured study guides, and comprehensive markdown research reports in seconds.
                   </p>
@@ -334,7 +329,7 @@ export default function Home() {
                 <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
                   <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-2">
                     <span className="text-indigo-400 font-mono font-semibold">MULTIPLE CHOICE QUIZ</span>
-                    <p className="text-white font-medium">Which protocol guarantees real-time broadcast across workspace members?</p>
+                    <p className="text-slate-50 font-medium">Which protocol guarantees real-time broadcast across workspace members?</p>
                     <div className="space-y-1.5 text-slate-300 pt-1">
                       <div className="p-2 rounded bg-indigo-600/20 border border-indigo-500/40 text-indigo-200">A) WebSockets + Redis PubSub (Correct)</div>
                       <div className="p-2 rounded bg-slate-800/60 text-slate-400">B) HTTP Long Polling</div>
@@ -351,7 +346,7 @@ export default function Home() {
                   <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
                     LangGraph Agent Architecture
                   </span>
-                  <h4 className="text-2xl font-bold text-white">Study Coach Agent with Human Approval</h4>
+                  <h4 className="text-2xl font-bold text-slate-50">Study Coach Agent with Human Approval</h4>
                   <p className="text-slate-400 text-sm leading-relaxed">
                     Set a learning or research goal. The autonomous Study Coach agent analyzes workspace context, drafts a multi-day study plan, requests human approval, and generates complete study packages.
                   </p>
@@ -390,7 +385,7 @@ export default function Home() {
                   <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
                     Real-Time WebSockets
                   </span>
-                  <h4 className="text-2xl font-bold text-white">Live Presence & Instant Workspace Sync</h4>
+                  <h4 className="text-2xl font-bold text-slate-50">Live Presence & Instant Workspace Sync</h4>
                   <p className="text-slate-400 text-sm leading-relaxed">
                     Collaborate seamlessly with team members. See live online presence indicators, instant workspace chat messages, and live generation updates as team members upload or query documents.
                   </p>
@@ -413,11 +408,11 @@ export default function Home() {
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex items-center justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                      <span className="text-white font-medium">Alex Rivera (Lead Engineer)</span>
+                      <span className="text-slate-50 font-medium">Alex Rivera (Lead Engineer)</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     </div>
                     <div className="flex items-center justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                      <span className="text-white font-medium">Sarah Chen (Researcher)</span>
+                      <span className="text-slate-50 font-medium">Sarah Chen (Researcher)</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     </div>
                   </div>
@@ -434,7 +429,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto space-y-16">
           
           <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <h3 className="text-3xl md:text-5xl font-serif font-semibold text-white tracking-tight">
+            <h3 className="text-3xl md:text-5xl font-serif font-semibold text-slate-50 tracking-tight">
               Engineered for speed, precision and scale
             </h3>
             <p className="text-slate-400 text-sm">
@@ -447,7 +442,7 @@ export default function Home() {
               <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                 <FileText className="w-6 h-6" />
               </div>
-              <h4 className="text-xl font-semibold text-white">RAG Document Pipeline</h4>
+              <h4 className="text-xl font-semibold text-slate-50">RAG Document Pipeline</h4>
               <p className="text-slate-400 text-sm leading-relaxed">
                 Automatic PDF/Doc text extraction, recursive chunking, and vector embedding indexing using pgvector.
               </p>
@@ -457,7 +452,7 @@ export default function Home() {
               <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                 <Brain className="w-6 h-6" />
               </div>
-              <h4 className="text-xl font-semibold text-white">AI Studio Generator</h4>
+              <h4 className="text-xl font-semibold text-slate-50">AI Studio Generator</h4>
               <p className="text-slate-400 text-sm leading-relaxed">
                 Generate interactive flashcards, practice quizzes with explanations, study guides, and comprehensive markdown reports.
               </p>
@@ -467,7 +462,7 @@ export default function Home() {
               <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
                 <Bot className="w-6 h-6" />
               </div>
-              <h4 className="text-xl font-semibold text-white">LangGraph AI Agent</h4>
+              <h4 className="text-xl font-semibold text-slate-50">LangGraph AI Agent</h4>
               <p className="text-slate-400 text-sm leading-relaxed">
                 Autonomous study coach that builds learning paths, waits for human approval, and generates comprehensive study packages.
               </p>
@@ -481,12 +476,12 @@ export default function Home() {
       <section id="faq" className="py-24 px-6 border-t border-slate-800/60 bg-slate-950/80">
         <div className="max-w-4xl mx-auto space-y-12">
           <div className="text-center space-y-3">
-            <h3 className="text-3xl font-serif font-semibold text-white tracking-tight">Frequently asked questions</h3>
+            <h3 className="text-3xl font-serif font-semibold text-slate-50 tracking-tight">Frequently asked questions</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-2">
-              <h4 className="text-white font-semibold text-base flex items-center gap-2">
+              <h4 className="text-slate-50 font-semibold text-base flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0" />
                 What document formats are supported?
               </h4>
@@ -496,7 +491,7 @@ export default function Home() {
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-2">
-              <h4 className="text-white font-semibold text-base flex items-center gap-2">
+              <h4 className="text-slate-50 font-semibold text-base flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0" />
                 How are citations verified?
               </h4>
@@ -506,7 +501,7 @@ export default function Home() {
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-2">
-              <h4 className="text-white font-semibold text-base flex items-center gap-2">
+              <h4 className="text-slate-50 font-semibold text-base flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0" />
                 How does human-in-the-loop work?
               </h4>
@@ -516,7 +511,7 @@ export default function Home() {
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-2">
-              <h4 className="text-white font-semibold text-base flex items-center gap-2">
+              <h4 className="text-slate-50 font-semibold text-base flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0" />
                 Can I run CollabMind locally or with Docker?
               </h4>
@@ -533,7 +528,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-indigo-900/60 to-slate-900 border border-indigo-500/30 p-10 md:p-16 text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none" />
           
-          <h3 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">
+          <h3 className="text-3xl md:text-5xl font-extrabold text-slate-50 tracking-tight">
             Ready to Supercharge Your Research & Study Workflows?
           </h3>
           <p className="text-slate-300 text-sm md:text-base max-w-2xl mx-auto">

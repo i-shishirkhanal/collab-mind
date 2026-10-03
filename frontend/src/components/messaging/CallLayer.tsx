@@ -38,7 +38,7 @@ function IncomingCall() {
       <div className="flex items-center gap-3">
         <Initials name={title} className="w-12 h-12" />
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-white truncate">{title}</div>
+          <div className="font-semibold text-slate-50 truncate">{title}</div>
           <div className="text-xs text-slate-400 flex items-center gap-1">
             {call.kind === "video" ? <Video className="w-3 h-3" /> : <Phone className="w-3 h-3" />}
             {isGroup ? `${call.started_by_name || "Someone"} started a ` : "Incoming "}
@@ -106,7 +106,7 @@ export function CallLayer() {
       {callError && (
         <div className="fixed z-[80] bottom-4 left-1/2 -translate-x-1/2 max-w-sm w-[calc(100%-2rem)] bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-3 flex items-start gap-2">
           <span className="flex-1">{callError}</span>
-          <button onClick={clearCallError} aria-label="Dismiss" className="text-red-300 hover:text-white"><X className="w-4 h-4" /></button>
+          <button onClick={clearCallError} aria-label="Dismiss" className="text-red-300 hover:text-slate-50"><X className="w-4 h-4" /></button>
         </div>
       )}
     </>

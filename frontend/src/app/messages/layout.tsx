@@ -14,7 +14,7 @@ export default function MessagesLayout({ children }: { children: React.ReactNode
   const atRoot = pathname === "/messages";
 
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-50">
+    <div className="flex h-screen bg-transparent overflow-hidden text-slate-50">
       <aside
         className={`${atRoot ? "flex" : "hidden"} md:flex w-full md:w-[320px] lg:w-[360px] flex-col shrink-0 bg-slate-900 border-r border-slate-800/60`}
       >

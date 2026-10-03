@@ -53,7 +53,7 @@ export function StudyGuideTool({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-8rem)]">
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-sm shrink-0">
-        <h2 className="text-xl font-semibold text-white mb-4">Generate Study Guide</h2>
+        <h2 className="text-xl font-semibold text-slate-50 mb-4">Generate Study Guide</h2>
         <div className="space-y-4 max-w-xl">
           <div className="space-y-2">
             <Label htmlFor="sg-topic" className="text-slate-300">Guide Topic</Label>

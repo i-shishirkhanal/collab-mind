@@ -5,49 +5,63 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * CollabMind identity: warm ink neutrals instead of Tailwind's default
- * blue-slate, and a citation-gold accent reserved for anything grounded in
- * a real source (citations, verified answers). Overriding the slate and
- * indigo scales here means every existing "slate" and "indigo" utility
- * class across the app picks up the new palette without touching each
- * component.
+ * CollabMind identity: "lesson app" lavender. The slate scale is inverted on
+ * purpose -- the app was authored for a dark canvas (slate-950 page, slate-50
+ * text), so flipping the scale re-skins every existing utility class to a
+ * light lavender canvas with white cards and violet-ink text. The indigo
+ * scale is the violet brand colour; 300/400 are text-on-tint shades, 500/600
+ * are fills.
  */
 @theme {
-  --color-slate-50: #f7f5f0;
-  --color-slate-100: #eeeae0;
-  --color-slate-200: #dfd8c8;
-  --color-slate-300: #c7bca5;
-  --color-slate-400: #a99c81;
-  --color-slate-500: #8c7f66;
-  --color-slate-600: #6d6350;
-  --color-slate-700: #514939;
-  --color-slate-800: #302a20;
-  --color-slate-900: #1c1811;
-  --color-slate-950: #0d0c0a;
+  --color-slate-50: #1d1440;
+  --color-slate-100: #261a52;
+  --color-slate-200: #35286a;
+  --color-slate-300: #4a3d82;
+  --color-slate-400: #6c619a;
+  --color-slate-500: #8a80b3;
+  --color-slate-600: #b3aad3;
+  --color-slate-700: #d9d0f2;
+  --color-slate-800: #e8e1fa;
+  --color-slate-900: #ffffff;
+  --color-slate-950: #f4eeff;
 
-  --color-indigo-50: #fcf4e3;
-  --color-indigo-100: #f7e6bd;
-  --color-indigo-200: #efce86;
-  --color-indigo-300: #e6b85e;
-  --color-indigo-400: #dba23f;
-  --color-indigo-500: #cb8e2e;
-  --color-indigo-600: #b57a22;
-  --color-indigo-700: #93631b;
-  --color-indigo-800: #5b3d12;
-  --color-indigo-900: #3b280d;
-  --color-indigo-950: #241809;
+  --color-indigo-50: #3b2590;
+  --color-indigo-100: #3b2590;
+  --color-indigo-200: #4a2fb0;
+  --color-indigo-300: #5a38c9;
+  --color-indigo-400: #6745e0;
+  --color-indigo-500: #7a5af5;
+  --color-indigo-600: #6b46e8;
+  --color-indigo-700: #5a37d0;
+  --color-indigo-800: #d9cdfc;
+  --color-indigo-900: #e6dcff;
+  --color-indigo-950: #efe8ff;
 
-  /* Agent/AI accent — distinct from the human-gold accent, used sparingly */
-  --color-teal-400: #5fb3a6;
-  --color-teal-500: #429184;
+  --color-purple-400: #8a4fd8;
+  --color-purple-500: #7a3fc8;
+  --color-purple-600: #6a30b8;
 
-  --font-serif: var(--font-source-serif);
+  /* Status colours re-tuned for contrast on light surfaces */
+  --color-red-300: #b4283a;
+  --color-red-400: #d1384b;
+  --color-red-500: #e0445a;
+  --color-emerald-400: #14966a;
+  --color-emerald-500: #1aa877;
+  --color-green-500: #1aa877;
+  --color-amber-400: #b86e08;
+  --color-amber-500: #d8890f;
+
+  /* Agent/AI accent */
+  --color-teal-400: #1b9a8d;
+  --color-teal-500: #1b9a8d;
+
+  --font-serif: var(--font-jakarta);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -88,72 +102,38 @@
 }
 
 :root {
-  --background: #f7f5f0;
-  --foreground: #1c1811;
+  --background: #f4eeff;
+  --foreground: #1d1440;
   --card: #ffffff;
-  --card-foreground: #1c1811;
+  --card-foreground: #1d1440;
   --popover: #ffffff;
-  --popover-foreground: #1c1811;
-  --primary: #b57a22; /* gold-600 */
-  --primary-foreground: #fcf4e3;
-  --secondary: #eeeae0;
-  --secondary-foreground: #302a20;
-  --muted: #eeeae0;
-  --muted-foreground: #6d6350;
-  --accent: #eeeae0;
-  --accent-foreground: #302a20;
-  --destructive: #c4574b;
-  --border: #dfd8c8;
-  --input: #dfd8c8;
-  --ring: #b57a22;
-  --chart-1: #dba23f;
-  --chart-2: #cb8e2e;
-  --chart-3: #b57a22;
-  --chart-4: #93631b;
-  --chart-5: #5b3d12;
-  --radius: 0.625rem;
-  --sidebar: #f7f5f0;
-  --sidebar-foreground: #1c1811;
-  --sidebar-primary: #b57a22;
-  --sidebar-primary-foreground: #fcf4e3;
-  --sidebar-accent: #eeeae0;
-  --sidebar-accent-foreground: #302a20;
-  --sidebar-border: #dfd8c8;
-  --sidebar-ring: #b57a22;
-}
-
-.dark {
-  --background: #100e0a; /* warm ink, not blue-slate */
-  --foreground: #f2eee4;
-  --card: #1c1811;
-  --card-foreground: #f2eee4;
-  --popover: #1c1811;
-  --popover-foreground: #f2eee4;
-  --primary: #dba23f; /* gold-400, tuned for contrast on ink */
-  --primary-foreground: #241809;
-  --secondary: #302a20;
-  --secondary-foreground: #f2eee4;
-  --muted: #302a20;
-  --muted-foreground: #a99c81;
-  --accent: #302a20;
-  --accent-foreground: #f2eee4;
-  --destructive: #d9776c;
-  --border: #302a20;
-  --input: #302a20;
-  --ring: #dba23f;
-  --chart-1: #dba23f;
-  --chart-2: #cb8e2e;
-  --chart-3: #b57a22;
-  --chart-4: #93631b;
-  --chart-5: #5b3d12;
-  --sidebar: #100e0a;
-  --sidebar-foreground: #f2eee4;
-  --sidebar-primary: #dba23f;
-  --sidebar-primary-foreground: #241809;
-  --sidebar-accent: #1c1811;
-  --sidebar-accent-foreground: #f2eee4;
-  --sidebar-border: #302a20;
-  --sidebar-ring: #dba23f;
+  --popover-foreground: #1d1440;
+  --primary: #6b46e8;
+  --primary-foreground: #ffffff;
+  --secondary: #ece4ff;
+  --secondary-foreground: #35286a;
+  --muted: #ece4ff;
+  --muted-foreground: #6c619a;
+  --accent: #ece4ff;
+  --accent-foreground: #35286a;
+  --destructive: #d1384b;
+  --border: #e8e1fa;
+  --input: #ddd2f7;
+  --ring: #7a5af5;
+  --chart-1: #7a5af5;
+  --chart-2: #6b46e8;
+  --chart-3: #5a37d0;
+  --chart-4: #9b82f7;
+  --chart-5: #3b2590;
+  --radius: 1rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1d1440;
+  --sidebar-primary: #6b46e8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ece4ff;
+  --sidebar-accent-foreground: #35286a;
+  --sidebar-border: #e8e1fa;
+  --sidebar-ring: #7a5af5;
 }
 
 @layer base {
@@ -161,9 +141,37 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: #f4eeff;
+    background-image: linear-gradient(180deg, #f6f1ff 0%, #ebe0ff 45%, #d3bffb 100%);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
   }
+}
+
+/* Soft violet lift for white surfaces, echoing the floating cards in the lesson-app reference. */
+[class*="bg-slate-900"][class*="rounded-"]:not([class*="bg-slate-900/"]),
+[class*="bg-slate-900/"][class*="rounded-2xl"],
+[class*="bg-slate-900/"][class*="rounded-3xl"] {
+  box-shadow: 0 10px 30px -14px rgba(107, 70, 232, 0.35);
+  border-color: transparent;
+}
+
+/* Oversized faded wordmark behind the page, like the "Education" backdrop in the reference. */
+.watermark {
+  position: fixed;
+  left: 50%;
+  bottom: -0.22em;
+  transform: translateX(-50%);
+  font-size: clamp(6rem, 22vw, 20rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: -1;
 }

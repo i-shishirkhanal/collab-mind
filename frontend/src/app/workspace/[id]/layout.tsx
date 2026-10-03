@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect } from "react";
+import { use } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageSquare, MessagesSquare, FileText, MonitorPlay, Users, Loader2, ArrowLeft } from "lucide-react";
@@ -32,7 +32,7 @@ export default function WorkspaceLayout({
 
   if (loading || !workspace) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-950">
+      <div className="flex flex-col items-center justify-center h-screen bg-transparent">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
       </div>
     );
@@ -40,20 +40,20 @@ export default function WorkspaceLayout({
 
   return (
     <SocketProvider workspaceId={id}>
-    <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-50">
+    <div className="flex h-screen bg-transparent overflow-hidden text-slate-50 md:gap-4 md:p-4">
       {/* Sidebar - 240px */}
-      <aside className="w-[240px] bg-slate-900 border-r border-slate-800/60 hidden md:flex flex-col shrink-0">
+      <aside className="w-[260px] bg-white rounded-[2rem] shadow-[0_16px_40px_-20px_rgba(107,70,232,0.5)] hidden md:flex flex-col shrink-0 overflow-hidden">
         {/* Logo / Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/60 shrink-0">
+        <div className="h-20 flex items-center justify-between px-5 shrink-0">
           <div className="flex items-center min-w-0 mr-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mr-3 shrink-0">
-              <span className="text-indigo-400 font-bold text-sm">CM</span>
+            <div className="size-10 rounded-full bg-indigo-600 flex items-center justify-center mr-3 shrink-0 shadow-[0_8px_18px_-8px_rgba(107,70,232,0.8)]">
+              <span className="text-white font-bold text-sm">CM</span>
             </div>
             <span className="font-semibold text-slate-200 truncate">{workspace.name}</span>
           </div>
           <Link
             href="/dashboard"
-            className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700/80 transition-colors shrink-0 flex items-center gap-1"
+            className="text-slate-400 hover:text-indigo-500 size-8 rounded-full bg-slate-950 transition-colors shrink-0 flex items-center justify-center"
             title="Back to Workspaces"
           >
             <ArrowLeft className="w-3 h-3" />
@@ -61,17 +61,17 @@ export default function WorkspaceLayout({
         </div>
         
         {/* Nav Links */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto py-2 px-4 space-y-2">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-row items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex flex-row items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold transition-colors ${
                   isActive 
-                    ? "bg-indigo-500/10 text-indigo-300" 
-                    : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                    ? "bg-indigo-600 text-white shadow-[0_10px_22px_-10px_rgba(107,70,232,0.8)]" 
+                    : "text-slate-400 hover:bg-slate-950 hover:text-slate-50"
                 }`}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
@@ -82,7 +82,7 @@ export default function WorkspaceLayout({
         </nav>
 
         {/* Member Avatars & Logout */}
-        <div className="p-4 border-t border-slate-800/60 space-y-4">
+        <div className="p-5 space-y-4 bg-slate-950/60 m-3 rounded-3xl">
           <div>
             <div className="text-xs font-medium text-slate-500 mb-3 px-1">Team activity</div>
             <div className="flex flex-wrap gap-2 px-1">
@@ -91,11 +91,11 @@ export default function WorkspaceLayout({
                 const isOnline = onlineMembers.includes(member.user_id);
                 return (
                   <div key={member.id} className="relative group cursor-pointer" title={member.name}>
-                    <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shadow-sm">
+                    <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-white flex items-center justify-center text-xs font-bold text-slate-300 shadow-sm">
                       {initials}
                     </div>
                     {isOnline && (
-                      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-900 rounded-full"></div>
+                      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
                     )}
                   </div>
                 );
@@ -108,14 +108,14 @@ export default function WorkspaceLayout({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-800/40">
+          <div className="pt-1">
             <LogoutButton className="w-full justify-start text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 px-3 py-2 rounded-lg transition-colors gap-2" />
           </div>
         </div>
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 md:rounded-[2rem] md:overflow-hidden">
         {/* Responsive Mobile Header */}
         <header className="h-16 md:hidden flex items-center justify-between px-4 border-b border-slate-800/60 bg-slate-900">
           <div className="flex items-center min-w-0">

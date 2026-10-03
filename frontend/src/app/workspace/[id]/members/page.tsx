@@ -83,7 +83,7 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-serif font-semibold text-white tracking-tight">Team members</h1>
+            <h1 className="text-2xl font-serif font-semibold text-slate-50 tracking-tight">Team members</h1>
             <p className="text-sm text-slate-400 mt-1">Manage access to this collaborative workspace.</p>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -101,7 +101,7 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-                className="bg-slate-800 border-slate-700 text-white flex-1"
+                className="bg-slate-800 border-slate-700 text-slate-50 flex-1"
                 disabled={inviting}
               />
               <select

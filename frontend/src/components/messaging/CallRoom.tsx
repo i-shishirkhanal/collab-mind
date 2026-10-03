@@ -68,7 +68,7 @@ function Tile({ participant, isLocal }: { participant: Participant; isLocal: boo
           {name}{isLocal ? " (you)" : ""}
         </span>
         {!micOn && (
-          <span className="p-1 rounded-md bg-red-500/80 text-white" title="Muted">
+          <span className="p-1 rounded-md bg-red-500/80 text-slate-50" title="Muted">
             <MicOff className="w-3.5 h-3.5" />
           </span>
         )}

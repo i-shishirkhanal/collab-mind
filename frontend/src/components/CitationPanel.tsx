@@ -21,7 +21,7 @@ export function CitationPanel({ citation, onClose }: CitationPanelProps) {
             <h3 className="font-serif font-semibold text-slate-200">Source</h3>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-md text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

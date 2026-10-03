@@ -38,7 +38,7 @@ export function CreateWorkspaceDialog() {
       }>
         <Plus className="mr-2 h-4 w-4" /> New Workspace
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-white">
+      <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-slate-50">
         <DialogHeader>
           <DialogTitle className="text-xl">Create Workspace</DialogTitle>
           <DialogDescription className="text-slate-400">
@@ -53,7 +53,7 @@ export function CreateWorkspaceDialog() {
               value={name} 
               onChange={(e) => setName(e.target.value)} 
               placeholder="e.g. Q3 Engineering" 
-              className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
               required 
             />
           </div>
@@ -64,11 +64,11 @@ export function CreateWorkspaceDialog() {
               value={description} 
               onChange={(e) => setDescription(e.target.value)} 
               placeholder="What is this workspace for?" 
-              className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
             />
           </div>
           <div className="flex justify-end pt-4 gap-3">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-700 text-slate-300 hover:text-slate-50 hover:bg-slate-800">
               Cancel
             </Button>
             <Button type="submit" disabled={!name.trim() || loading} className="bg-indigo-600 hover:bg-indigo-700 text-white">

@@ -36,7 +36,7 @@ export function FlashcardsTool({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-sm">
-        <h2 className="text-xl font-semibold text-white mb-4">Generate Flashcards</h2>
+        <h2 className="text-xl font-semibold text-slate-50 mb-4">Generate Flashcards</h2>
         <div className="space-y-4 max-w-xl">
           <div className="space-y-2">
             <Label htmlFor="topic" className="text-slate-300">Topic (Optional)</Label>
@@ -102,7 +102,7 @@ export function FlashcardsTool({ workspaceId }: { workspaceId: string }) {
                   </div>
                   {/* Back */}
                   <div className="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-950/40 border border-indigo-900 rounded-2xl p-6 flex items-center justify-center text-center shadow-md overflow-y-auto">
-                    <p className="text-white font-medium text-sm">{card.back}</p>
+                    <p className="text-slate-50 font-medium text-sm">{card.back}</p>
                   </div>
                 </div>
               </div>

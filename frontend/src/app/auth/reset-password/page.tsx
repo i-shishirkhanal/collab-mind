@@ -37,7 +37,7 @@ function ResetPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-slate-200">
       <div className="w-full max-w-[420px] space-y-5 rounded-2xl border border-slate-800 bg-slate-900/90 p-8">
-        <h1 className="font-serif text-2xl text-white">Choose a new password</h1>
+        <h1 className="font-serif text-2xl text-slate-50">Choose a new password</h1>
         {done ? (
           <p className="text-sm text-emerald-400">Password updated. You can now sign in.</p>
         ) : !token ? (
@@ -56,7 +56,7 @@ function ResetPassword() {
                 placeholder={`${label} (min 10 characters)`}
                 value={value as string}
                 onChange={(e) => (set as (v: string) => void)(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-50 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
               />
             ))}
             <Button type="submit" disabled={loading} className="h-11 w-full rounded-xl bg-indigo-600 text-white hover:bg-indigo-500">

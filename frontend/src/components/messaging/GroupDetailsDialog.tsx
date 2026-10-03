@@ -62,13 +62,13 @@ export function GroupDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[460px] bg-slate-900 border-slate-800 text-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[460px] bg-slate-900 border-slate-800 text-slate-50 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           {editing ? (
             <div className="flex items-center gap-2 pr-8">
               <Input
                 value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus aria-label="Group name"
-                className="bg-slate-800 border-slate-700 text-white"
+                className="bg-slate-800 border-slate-700 text-slate-50"
                 onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) saveName(); }}
               />
               <Button size="icon" disabled={!name.trim() || busyId === "name"} onClick={saveName} aria-label="Save name">
@@ -80,7 +80,7 @@ export function GroupDetailsDialog({
             <DialogTitle className="text-xl flex items-center gap-2 pr-8">
               <span className="truncate">{conversation.name}</span>
               {isAdmin && (
-                <button type="button" onClick={() => setEditing(true)} aria-label="Rename group" className="p-1 text-slate-400 hover:text-white"><Pencil className="w-4 h-4" /></button>
+                <button type="button" onClick={() => setEditing(true)} aria-label="Rename group" className="p-1 text-slate-400 hover:text-slate-50"><Pencil className="w-4 h-4" /></button>
               )}
             </DialogTitle>
           )}
