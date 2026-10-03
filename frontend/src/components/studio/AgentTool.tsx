@@ -5,21 +5,47 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Zap, CheckCircle2, Circle } from "lucide-react";
-import { triggerStudyCoach, getAgentStatus, approveAgent } from "@/lib/api";
+import { triggerStudyCoach, getAgentStatus, approveAgent, getLatestAgentRun } from "@/lib/api";
 
 type AgentStatus = 'analyzing' | 'planning' | 'awaiting_approval' | 'generating' | 'done' | 'failed';
+
+/** The service stores 'started' and 'completed'; the tracker uses 'analyzing' and 'done'. */
+const toUiStatus = (s: string): AgentStatus =>
+  s === "completed" ? "done" : s === "started" ? "analyzing" : (s as AgentStatus);
 
 export function AgentTool({ workspaceId }: { workspaceId: string }) {
   const [goal, setGoal] = useState("");
   const [runId, setRunId] = useState<string | null>(null);
-  
+
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [plan, setPlan] = useState<unknown>(null);
+  const [materials, setMaterials] = useState<string | null>(null);
+
+  // Pick up the workspace's latest run again after a refresh (finished, or still in progress).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { run_id } = await getLatestAgentRun(workspaceId);
+        if (!run_id || cancelled) return;
+        const data = await getAgentStatus(workspaceId, run_id);
+        if (cancelled) return;
+        setRunId(run_id);
+        setStatus(toUiStatus(data.status));
+        if (data.plan) setPlan(data.plan);
+        if (data.materials) setMaterials(data.materials);
+      } catch {
+        // nothing to resume, or offline: start empty
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   const startAgent = async () => {
     if (!goal) return;
     setStatus("analyzing");
     setPlan(null);
+    setMaterials(null);
     try {
       const { run_id } = await triggerStudyCoach(workspaceId, goal);
       setRunId(run_id);
@@ -47,10 +73,11 @@ export function AgentTool({ workspaceId }: { workspaceId: string }) {
       if (!runId || status === "done" || status === "failed") return;
       try {
         const data = await getAgentStatus(workspaceId, runId);
-        setStatus(data.status);
+        setStatus(toUiStatus(data.status));
         if (data.plan) {
            setPlan(data.plan);
         }
+        if (data.materials) setMaterials(data.materials);
       } catch (err) {
         console.error("Polling error", err);
       }
@@ -73,6 +100,7 @@ export function AgentTool({ workspaceId }: { workspaceId: string }) {
 
   const getStepState = (stepId: string) => {
     if (status === "failed") return "failed";
+    if (status === "done") return "done";
     const idx = steps.findIndex(s => s.id === stepId);
     const currIdx = steps.findIndex(s => s.id === status);
     
@@ -152,6 +180,12 @@ export function AgentTool({ workspaceId }: { workspaceId: string }) {
                     {step.id === "planning" && plan != null && (state === "done" || state === "active") && (
                        <pre className="mt-3 bg-slate-950 p-3 rounded text-xs text-slate-400 overflow-x-auto border border-slate-800">
                          {JSON.stringify(plan, null, 2)}
+                       </pre>
+                    )}
+
+                    {step.id === "done" && state === "done" && materials && (
+                       <pre className="mt-3 bg-slate-950 p-3 rounded text-xs text-slate-300 whitespace-pre-wrap overflow-x-auto border border-slate-800 max-h-96 overflow-y-auto">
+                         {materials}
                        </pre>
                     )}
 

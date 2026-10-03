@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import { generateQuiz } from "@/lib/api";
+import { generateQuiz, getLatestStudio } from "@/lib/api";
 import { QuizQuestion } from "@/types";
 
 export function QuizTool({ workspaceId }: { workspaceId: string }) {
@@ -15,6 +15,21 @@ export function QuizTool({ workspaceId }: { workspaceId: string }) {
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
+
+  // Show the last saved quiz again after a refresh.
+  useEffect(() => {
+    let cancelled = false;
+    getLatestStudio(workspaceId, "quiz")
+      .then(({ output }) => {
+        if (cancelled || !output?.content?.questions) return;
+        setQuestions(output.content.questions);
+        if (typeof output.params?.topic === "string") setTopic(output.params.topic);
+        if (typeof output.params?.difficulty === "string") setDifficulty(output.params.difficulty);
+        if (typeof output.params?.count === "number") setCount(output.params.count);
+      })
+      .catch(() => {}); // nothing saved yet, or offline: start empty
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   const handleGenerate = async () => {
     if (!topic) return;

@@ -175,7 +175,15 @@ export const approveAgent = (workspaceId: string, runId: string) =>
 export const getAgentStatus = (workspaceId: string, runId: string) => 
   apiCall(`/api/workspaces/${workspaceId}/agents/${runId}/status`);
 
-export const generateFlashcards = (workspaceId: string, topic: string, count: number) => 
+export const getLatestAgentRun = (workspaceId: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/agents/latest`);
+
+export type StudioKind = 'flashcards' | 'quiz' | 'guide' | 'report';
+/** The most recent saved result for a Studio tool: { output: { params, content, created_at } | null }. */
+export const getLatestStudio = (workspaceId: string, kind: StudioKind) =>
+  apiCall(`/api/workspaces/${workspaceId}/studio/${kind}/latest`);
+
+export const generateFlashcards = (workspaceId: string, topic: string, count: number) =>
   apiCall(`/api/workspaces/${workspaceId}/studio/flashcards`, { method: 'POST', body: JSON.stringify({ topic, count }) });
 export const generateQuiz = (workspaceId: string, topic: string, difficulty: string, count: number) => 
   apiCall(`/api/workspaces/${workspaceId}/studio/quiz`, { method: 'POST', body: JSON.stringify({ topic, difficulty, count }) });

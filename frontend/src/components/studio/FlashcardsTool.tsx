@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { generateFlashcards } from "@/lib/api";
+import { generateFlashcards, getLatestStudio } from "@/lib/api";
 import { Flashcard } from "@/types";
 
 export function FlashcardsTool({ workspaceId }: { workspaceId: string }) {
@@ -14,6 +14,20 @@ export function FlashcardsTool({ workspaceId }: { workspaceId: string }) {
   const [loading, setLoading] = useState(false);
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [flipped, setFlipped] = useState<Record<number, boolean>>({});
+
+  // Show the last saved set again after a refresh.
+  useEffect(() => {
+    let cancelled = false;
+    getLatestStudio(workspaceId, "flashcards")
+      .then(({ output }) => {
+        if (cancelled || !output?.content?.flashcards) return;
+        setCards(output.content.flashcards);
+        if (typeof output.params?.topic === "string") setTopic(output.params.topic);
+        if (typeof output.params?.count === "number") setCount(output.params.count);
+      })
+      .catch(() => {}); // nothing saved yet, or offline: start empty
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   const handleGenerate = async () => {
     if (!workspaceId) return;

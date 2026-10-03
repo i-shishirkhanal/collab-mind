@@ -1,17 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, X, Download } from "lucide-react";
-import { generateReport } from "@/lib/api";
+import { generateReport, getLatestStudio } from "@/lib/api";
 
 export function ReportTool({ workspaceId }: { workspaceId: string }) {
   const [title, setTitle] = useState("");
   const [points, setPoints] = useState<string[]>([""]);
   const [loading, setLoading] = useState(false);
   const [reportText, setReportText] = useState<string | null>(null);
+
+  // Show the last saved report again after a refresh.
+  useEffect(() => {
+    let cancelled = false;
+    getLatestStudio(workspaceId, "report")
+      .then(({ output }) => {
+        if (cancelled || !output?.content) return;
+        setReportText(output.content.markdown || output.content.content || "");
+        if (typeof output.params?.title === "string") setTitle(output.params.title);
+        const pts = Array.isArray(output.params?.outline_points)
+          ? output.params.outline_points.filter((p: unknown) => typeof p === "string")
+          : [];
+        if (pts.length > 0) setPoints(pts);
+      })
+      .catch(() => {}); // nothing saved yet, or offline: start empty
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   const addPoint = () => setPoints([...points, ""]);
   const updatePoint = (index: number, val: string) => {

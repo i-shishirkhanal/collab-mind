@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { generateStudyGuide } from "@/lib/api";
+import { generateStudyGuide, getLatestStudio } from "@/lib/api";
 
 interface GuideResponse {
   title?: string;
@@ -32,6 +32,19 @@ export function StudyGuideTool({ workspaceId }: { workspaceId: string }) {
   const [loading, setLoading] = useState(false);
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Show the last saved guide again after a refresh.
+  useEffect(() => {
+    let cancelled = false;
+    getLatestStudio(workspaceId, "guide")
+      .then(({ output }) => {
+        if (cancelled || !output?.content) return;
+        setContent(guideToMarkdown(output.content));
+        if (typeof output.params?.topic === "string") setTopic(output.params.topic);
+      })
+      .catch(() => {}); // nothing saved yet, or offline: start empty
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   const handleGenerate = async () => {
     if (!topic) return;

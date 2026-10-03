@@ -98,25 +98,86 @@ router.get('/:workspaceId/agents/:runId/status', ...guardRun, assertRunInWorkspa
 
 // STUDIO ENDPOINTS
 
-const proxyStudio = (endpoint) => async (req, res, next) => {
+const STUDIO_KINDS = ['flashcards', 'quiz', 'guide', 'report'];
+const STUDIO_KEEP = 20; // saved generations kept per workspace and tool
+
+/** Saves a generation so a page refresh can show it again. Best effort: never fails the request. */
+const saveStudioOutput = async (workspaceId, userId, kind, params, content) => {
   try {
+    await pool.query(
+      `INSERT INTO studio_outputs (workspace_id, user_id, kind, params, content)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [workspaceId, userId, kind, JSON.stringify(params), JSON.stringify(content)],
+    );
+    await pool.query(
+      `DELETE FROM studio_outputs
+        WHERE workspace_id = $1 AND kind = $2
+          AND id NOT IN (SELECT id FROM studio_outputs WHERE workspace_id = $1 AND kind = $2
+                          ORDER BY created_at DESC LIMIT $3)`,
+      [workspaceId, kind, STUDIO_KEEP],
+    );
+  } catch (err) {
+    console.error(`[Studio] could not save ${kind} output: ${err.message}`);
+  }
+};
+
+const proxyStudio = (endpoint, kind) => async (req, res, next) => {
+  try {
+    const params = req.body && typeof req.body === 'object' ? req.body : {};
     // workspace_id comes LAST so a client-supplied value can never override the
     // workspace the caller was authorised for.
     const body = {
-      ...(req.body && typeof req.body === 'object' ? req.body : {}),
+      ...params,
       workspace_id: req.params.workspaceId,
       user_id: req.user.id, // usage is attributed to the caller, never to a client-supplied id
     };
     const response = await aiClient.post(`/studio/${endpoint}`, body, { timeout: 120_000 });
+    await saveStudioOutput(req.params.workspaceId, req.user.id, kind, params, response.data);
     res.json(response.data);
   } catch (err) {
     relayError(err, res, next);
   }
 };
 
-router.post('/:workspaceId/studio/flashcards', ...costlyGuard, proxyStudio('flashcards'));
-router.post('/:workspaceId/studio/quiz', ...costlyGuard, proxyStudio('quiz'));
-router.post('/:workspaceId/studio/guide', ...costlyGuard, proxyStudio('study-guide'));
-router.post('/:workspaceId/studio/report', ...costlyGuard, proxyStudio('report'));
+router.post('/:workspaceId/studio/flashcards', ...costlyGuard, proxyStudio('flashcards', 'flashcards'));
+router.post('/:workspaceId/studio/quiz', ...costlyGuard, proxyStudio('quiz', 'quiz'));
+router.post('/:workspaceId/studio/guide', ...costlyGuard, proxyStudio('study-guide', 'guide'));
+router.post('/:workspaceId/studio/report', ...costlyGuard, proxyStudio('report', 'report'));
+
+/**
+ * GET /api/workspaces/:workspaceId/studio/:kind/latest
+ * The most recent saved result for a tool, or { output: null } when there is none.
+ */
+router.get('/:workspaceId/studio/:kind/latest', ...guard, async (req, res, next) => {
+  try {
+    const { kind } = req.params;
+    if (!STUDIO_KINDS.includes(kind)) throw httpError(404, 'Unknown studio tool');
+    const { rows } = await pool.query(
+      `SELECT params, content, created_at FROM studio_outputs
+        WHERE workspace_id = $1 AND kind = $2 ORDER BY created_at DESC LIMIT 1`,
+      [req.params.workspaceId, kind],
+    );
+    res.json({ output: rows[0] || null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/workspaces/:workspaceId/agents/latest
+ * The id of the workspace's most recent study-coach run, so the page can resume it after a refresh.
+ */
+router.get('/:workspaceId/agents/latest', ...guard, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id FROM agent_runs WHERE workspace_id = $1 AND agent_type = 'study_coach'
+        ORDER BY created_at DESC LIMIT 1`,
+      [req.params.workspaceId],
+    );
+    res.json({ run_id: rows[0] ? rows[0].id : null });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
