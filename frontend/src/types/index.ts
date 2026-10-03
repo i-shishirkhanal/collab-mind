@@ -12,6 +12,22 @@ export interface Workspace {
   owner_id: string;
   member_count: number;
   source_count: number;
+  role?: 'owner' | 'admin' | 'member';
+  created_at?: string;
+  processing_count?: number;
+  failed_count?: number;
+  pending_approvals?: number;
+  last_activity_at?: string | null;
+}
+
+export interface ActivityItem {
+  kind: 'question' | 'source' | 'agent';
+  workspace_id: string;
+  workspace_name: string;
+  actor_name: string | null;
+  label: string;
+  status: string | null;
+  created_at: string;
 }
 
 export interface WorkspaceMember {

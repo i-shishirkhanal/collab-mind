@@ -59,6 +59,7 @@ export async function apiCall(endpoint: string, options: RequestInit = {}): Prom
 
 // Workspace API
 export const getWorkspaces = () => apiCall('/api/workspaces');
+export const getRecentActivity = () => apiCall('/api/workspaces/activity/recent');
 export const getWorkspaceById = (id: string) => apiCall(`/api/workspaces/${id}`);
 export const getWorkspace = getWorkspaceById;
 export const createWorkspace = (data: { name: string; description?: string } | string, description?: string) => {

@@ -12,12 +12,65 @@ const pool = require('../db/postgres');
 const getUserWorkspaces = async (userId) => {
   const { rows } = await pool.query(
     `SELECT w.id, w.name, w.description, w.avatar_url, w.created_at,
-            wm.role, wm.joined_at
+            wm.role, wm.joined_at,
+            (SELECT COUNT(*)::int FROM workspace_members m WHERE m.workspace_id = w.id) AS member_count,
+            (SELECT COUNT(*)::int FROM sources s WHERE s.workspace_id = w.id) AS source_count,
+            (SELECT COUNT(*)::int FROM sources s
+              WHERE s.workspace_id = w.id AND s.status = 'processing') AS processing_count,
+            (SELECT COUNT(*)::int FROM sources s
+              WHERE s.workspace_id = w.id AND s.status = 'failed') AS failed_count,
+            (SELECT COUNT(*)::int FROM agent_runs r
+              WHERE r.workspace_id = w.id AND r.status = 'awaiting_approval') AS pending_approvals,
+            GREATEST(
+              w.updated_at,
+              (SELECT MAX(c.created_at) FROM chat_messages c WHERE c.workspace_id = w.id),
+              (SELECT MAX(s.created_at) FROM sources s WHERE s.workspace_id = w.id),
+              (SELECT MAX(r.updated_at) FROM agent_runs r WHERE r.workspace_id = w.id)
+            ) AS last_activity_at
        FROM workspaces w
        JOIN workspace_members wm ON wm.workspace_id = w.id
       WHERE wm.user_id = $1
       ORDER BY w.created_at DESC`,
     [userId],
+  );
+  return rows;
+};
+
+/**
+ * getRecentActivity
+ * ─────────────────
+ * Latest questions, uploads and agent runs across every workspace the user belongs to, newest first.
+ *
+ * @param {string} userId
+ * @param {number} [limit=8]
+ * @returns {Promise<Array>} [{ kind, workspace_id, workspace_name, actor_name, label, status, created_at }]
+ */
+const getRecentActivity = async (userId, limit = 8) => {
+  const { rows } = await pool.query(
+    `SELECT * FROM (
+       SELECT 'question' AS kind, w.id AS workspace_id, w.name AS workspace_name,
+              u.name AS actor_name, LEFT(c.content, 140) AS label, NULL AS status, c.created_at
+         FROM chat_messages c
+         JOIN workspaces w ON w.id = c.workspace_id
+         JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = $1
+         LEFT JOIN users u ON u.id = c.user_id
+        WHERE c.role = 'user'
+       UNION ALL
+       SELECT 'source', w.id, w.name, u.name, s.name, s.status, s.created_at
+         FROM sources s
+         JOIN workspaces w ON w.id = s.workspace_id
+         JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = $1
+         LEFT JOIN users u ON u.id = s.created_by
+       UNION ALL
+       SELECT 'agent', w.id, w.name, u.name, r.agent_type, r.status, r.created_at
+         FROM agent_runs r
+         JOIN workspaces w ON w.id = r.workspace_id
+         JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = $1
+         LEFT JOIN users u ON u.id = r.user_id
+     ) activity
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [userId, limit],
   );
   return rows;
 };
@@ -124,4 +177,4 @@ const deleteWorkspace = async (workspaceId) => {
   await Promise.all(stored.map((r) => deleteStoredFile(r.url))); // best-effort, never throws
 };
 
-module.exports = { getUserWorkspaces, createWorkspace, getWorkspaceById, updateWorkspace, deleteWorkspace };
+module.exports = { getUserWorkspaces, getRecentActivity, createWorkspace, getWorkspaceById, updateWorkspace, deleteWorkspace };

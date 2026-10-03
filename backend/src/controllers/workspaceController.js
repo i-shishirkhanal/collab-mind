@@ -14,6 +14,18 @@ const listWorkspaces = async (req, res, next) => {
 };
 
 /**
+ * recentActivity — GET /workspaces/activity/recent
+ * Latest questions, uploads and agent runs across the user's workspaces.
+ */
+const recentActivity = async (req, res, next) => {
+  try {
+    res.json(await workspaceService.getRecentActivity(req.user.id));
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * createWorkspace — POST /workspaces
  * Body: { name, description?, avatar_url? }
  */
@@ -115,4 +127,4 @@ const deleteWorkspace = async (req, res, next) => {
   }
 };
 
-module.exports = { listWorkspaces, createWorkspace, getWorkspace, updateWorkspace, deleteWorkspace };
+module.exports = { listWorkspaces, recentActivity, createWorkspace, getWorkspace, updateWorkspace, deleteWorkspace };

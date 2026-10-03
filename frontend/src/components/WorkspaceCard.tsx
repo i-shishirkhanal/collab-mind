@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, FileText, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, FileText, Loader2, ShieldQuestion, Users } from "lucide-react";
 import { Workspace } from "@/types";
+import { timeAgo } from "@/lib/utils";
 
 interface WorkspaceCardProps {
   workspace: Workspace;
@@ -13,10 +14,14 @@ const roleStyles: Record<string, string> = {
   admin: "bg-purple-500/10 text-purple-500",
   editor: "bg-purple-500/10 text-purple-500",
   viewer: "bg-slate-500/10 text-slate-400",
+  member: "bg-slate-500/10 text-slate-400",
 };
 
 export function WorkspaceCard({ workspace, role, index = 0 }: WorkspaceCardProps) {
   const badgeClass = roleStyles[role] || roleStyles.viewer;
+  const processing = workspace.processing_count ?? 0;
+  const failed = workspace.failed_count ?? 0;
+  const approvals = workspace.pending_approvals ?? 0;
 
   return (
     <Link
@@ -33,14 +38,34 @@ export function WorkspaceCard({ workspace, role, index = 0 }: WorkspaceCardProps
             {role}
           </span>
         </span>
-        <span className="mt-0.5 flex items-center gap-4 text-xs text-slate-400">
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-slate-400">
           <span className="flex items-center gap-1.5">
-            <Users className="size-3.5" /> {workspace.member_count} Members
+            <Users className="size-3.5" /> {workspace.member_count ?? 0} Members
           </span>
           <span className="flex items-center gap-1.5">
-            <FileText className="size-3.5" /> {workspace.source_count} Sources
+            <FileText className="size-3.5" /> {workspace.source_count ?? 0} Sources
           </span>
+          <span>{timeAgo(workspace.last_activity_at)}</span>
         </span>
+        {(processing > 0 || failed > 0 || approvals > 0) && (
+          <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+            {approvals > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-400">
+                <ShieldQuestion className="size-3" /> {approvals} awaiting approval
+              </span>
+            )}
+            {processing > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-indigo-300">
+                <Loader2 className="size-3 animate-spin" /> {processing} indexing
+              </span>
+            )}
+            {failed > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-red-400">
+                <AlertTriangle className="size-3" /> {failed} failed
+              </span>
+            )}
+          </span>
+        )}
         {workspace.description && (
           <span className="mt-1 block truncate text-xs text-slate-500">{workspace.description}</span>
         )}

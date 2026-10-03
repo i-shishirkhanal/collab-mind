@@ -18,6 +18,16 @@ router.get(
 );
 
 /**
+ * GET /workspaces/activity/recent
+ * Recent activity across the user's workspaces. Declared before /:workspaceId.
+ */
+router.get(
+  '/activity/recent',
+  authenticate,
+  workspaceController.recentActivity,
+);
+
+/**
  * POST /workspaces
  * Create a new workspace. The creator is automatically added as owner.
  * Middleware: authenticate
