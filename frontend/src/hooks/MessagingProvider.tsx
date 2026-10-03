@@ -88,12 +88,22 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     socketRef.current = socket;
     const timers = typingTimers.current;
 
-    const syncOnConnect = () => {
-      setConnected(true);
-      refreshConversations();
+    const queryPresence = () => {
+      if (!socket.connected) return;
       socket.emit("presence:query", (res: { onlineUserIds?: string[] }) => {
         store.getState().setOnline(res?.onlineUserIds || []);
       });
+    };
+    // Self-heal: re-query periodically and on tab focus so a missed presence event never sticks.
+    const presenceTimer = setInterval(queryPresence, 30_000);
+    const onVisible = () => { if (document.visibilityState === "visible") queryPresence(); };
+    document.addEventListener("visibilitychange", onVisible);
+    socket.on("messaging:ready", queryPresence);
+
+    const syncOnConnect = () => {
+      setConnected(true);
+      refreshConversations();
+      queryPresence();
       api.getPendingCalls()
         .then(({ calls }) => {
           const s = store.getState();
@@ -174,6 +184,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return () => {
       timers.forEach(clearTimeout);
       timers.clear();
+      clearInterval(presenceTimer);
+      document.removeEventListener("visibilitychange", onVisible);
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
