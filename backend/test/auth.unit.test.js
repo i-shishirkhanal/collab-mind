@@ -88,7 +88,7 @@ test('passwords are scrypt-hashed with unique salts and verify correctly', async
 });
 
 test('password policy', () => {
-  assert.match(passwordPolicyError('short'), /at least 10/);
+  assert.match(passwordPolicyError('short'), /at least 6/);
   assert.match(passwordPolicyError('a'.repeat(129)), /at most/);
   assert.match(passwordPolicyError('aaaaaaaaaaaa'), /too simple/);
   assert.match(passwordPolicyError('ada@example.com', 'ada@example.com'), /email/);

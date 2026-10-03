@@ -7,7 +7,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mail, Lock, User, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Loader2, Mail, Lock, User, AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { registerAccount, resendVerification } from "@/lib/authApi";
 import { errorMessage } from "@/lib/errors";
 
@@ -26,6 +26,9 @@ export default function SignIn() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,7 @@ export default function SignIn() {
     setError(null);
     setNotice(null);
     setNeedsVerification(false);
+    setConfirmPassword("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,6 +48,11 @@ export default function SignIn() {
     setError(null);
     setNotice(null);
     setNeedsVerification(false);
+
+    if (isSignUp && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -52,6 +61,7 @@ export default function SignIn() {
         setNotice(res.message || "Check your email for a verification link, then sign in.");
         setIsSignUp(false);
         setPassword("");
+        setConfirmPassword("");
         return;
       }
 
@@ -194,18 +204,54 @@ export default function SignIn() {
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
-                type="password"
-                placeholder={isSignUp ? "At least 10 characters" : "••••••••"}
+                type={showPassword ? "text" : "password"}
+                placeholder={isSignUp ? "At least 6 characters" : "••••••••"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={isSignUp ? 10 : undefined}
+                minLength={isSignUp ? 6 : undefined}
                 maxLength={128}
                 autoComplete={isSignUp ? "new-password" : "current-password"}
-                className={inputClass}
+                className={`${inputClass} pr-11`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
+
+          {isSignUp && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-300">Confirm Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  className={`${inputClass} pr-11`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((s) => !s)}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
 
           <Button
             type="submit"

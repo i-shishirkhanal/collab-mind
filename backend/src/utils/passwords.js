@@ -14,7 +14,7 @@ const costParams = () => {
 const KEY_LEN = 64;
 const maxmemFor = ({ N, r, p }) => 128 * N * r * p + 16 * 1024 * 1024;
 
-const PASSWORD_MIN = 10;
+const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 128;
 
 /** Returns an error string, or null when the password is acceptable. */

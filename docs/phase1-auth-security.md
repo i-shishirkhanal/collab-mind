@@ -18,7 +18,7 @@ Branch: `phase1/auth-security`. Canonical schema: `supabase/migrations/` (the ro
 
 Removed: `POST /api/auth/google`, `POST /api/auth/email` (passwordless token minting), demo/guest tokens, `config/demoAuth.js`, the Google button, the "1-Click Quick Demo" button, the Supabase OAuth callback route.
 
-* Passwords: scrypt (N=2^16, r=8, p=2, per-user salt, parameters stored in the hash), min 10 / max 128 chars.
+* Passwords: scrypt (N=2^16, r=8, p=2, per-user salt, parameters stored in the hash), min 6 / max 128 chars.
 * Session token: JWT HS256 with `iss=collabmind-api`, `aud=collabmind-app`, `sub=<user id>`, `jti=<session id>`, `exp` (`JWT_EXPIRES_IN`, default 7d, max 30d). **Also** backed by a row in `auth_sessions`; `authenticate` checks signature, algorithm, issuer, audience, expiry, session not revoked/expired, and email still verified.
 * `req.user = { id, email, name, sessionId }` — JWT claims are no longer spread into it. `socket.user = { id, email, name }`.
 * Rate limits (per IP and per account; memory store, or Redis with `RATE_LIMIT_STORE=redis`): login 30/15 min per IP and 10/15 min per email; register 10/h per IP; resend/forgot 20/h per IP and 5/h per email; verify/reset 30/15 min per IP. `429 {code:'RATE_LIMITED'}` + `Retry-After`.

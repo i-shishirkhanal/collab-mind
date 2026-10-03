@@ -87,8 +87,8 @@ export default function SettingsPage() {
         <form onSubmit={submitPassword} className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/90 p-6">
           <h2 className="text-lg text-slate-50">Change password</h2>
           <input type="password" required autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} maxLength={128} className={field} />
-          <input type="password" required autoComplete="new-password" minLength={10} maxLength={128} placeholder="New password (min 10 characters)" value={next} onChange={(e) => setNext(e.target.value)} className={field} />
-          <input type="password" required autoComplete="new-password" minLength={10} maxLength={128} placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={field} />
+          <input type="password" required autoComplete="new-password" minLength={6} maxLength={128} placeholder="New password (min 6 characters)" value={next} onChange={(e) => setNext(e.target.value)} className={field} />
+          <input type="password" required autoComplete="new-password" minLength={6} maxLength={128} placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={field} />
           <NoticeLine notice={pwNotice} />
           <Button type="submit" disabled={busy !== null}>{busy === "pw" ? "Saving…" : "Change password"}</Button>
         </form>
