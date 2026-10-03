@@ -93,7 +93,7 @@ export function StudyGuideTool({ workspaceId }: { workspaceId: string }) {
 
       {content && !loading && (
         <div className="flex-1 bg-slate-800 rounded-2xl border border-slate-700 p-8 shadow-inner overflow-hidden flex flex-col min-h-[500px]">
-          <div className="prose prose-invert prose-indigo max-w-none overflow-y-auto custom-scrollbar pr-4 flex-1">
+          <div className="prose prose-indigo max-w-none overflow-y-auto custom-scrollbar pr-4 flex-1">
             {/* Model output built from uploaded documents is untrusted: remote images would be a data-exfiltration channel. */}
             <ReactMarkdown disallowedElements={["img"]} unwrapDisallowed>{content}</ReactMarkdown>
           </div>

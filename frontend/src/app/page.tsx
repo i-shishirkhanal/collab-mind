@@ -371,7 +371,7 @@ export default function Home() {
                     <div className="p-2 bg-slate-900 rounded border border-slate-800 text-slate-300">2. create_plan() → Drafted 3-day study schedule</div>
                     <div className="p-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded flex items-center justify-between">
                       <span>3. human_approval_gate</span>
-                      <span className="bg-amber-500 text-slate-950 px-2 py-0.5 rounded font-bold">APPROVED</span>
+                      <span className="bg-amber-500 text-white px-2 py-0.5 rounded font-bold">APPROVED</span>
                     </div>
                     <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded">4. generate_materials() → Materials package saved</div>
                   </div>
@@ -525,19 +525,19 @@ export default function Home() {
 
       {/* High-Impact Bottom Call to Action (CTA) Banner */}
       <section className="py-20 px-6 relative">
-        <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-indigo-900/60 to-slate-900 border border-indigo-500/30 p-10 md:p-16 text-center space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-500 border border-transparent p-10 md:p-16 text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none" />
           
           <h3 className="text-3xl md:text-5xl font-extrabold text-slate-50 tracking-tight">
             Ready to Supercharge Your Research & Study Workflows?
           </h3>
-          <p className="text-slate-300 text-sm md:text-base max-w-2xl mx-auto">
+          <p className="text-white/85 text-sm md:text-base max-w-2xl mx-auto">
             Join researchers, engineers, and students building intelligent team knowledge hubs with CollabMind AI.
           </p>
 
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/auth/signin" className="w-full sm:w-auto">
-              <Button size="lg" className="w-full sm:w-auto bg-white hover:bg-slate-100 text-slate-950 font-bold h-13 px-8 rounded-2xl shadow-xl text-base transition-all hover:scale-[1.02]">
+              <Button size="lg" className="w-full sm:w-auto bg-white hover:bg-white/90 text-indigo-600 font-bold h-13 px-8 rounded-2xl shadow-xl text-base transition-all hover:scale-[1.02]">
                 Get Started Free Now
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
