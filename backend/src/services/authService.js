@@ -59,16 +59,20 @@ const register = async ({ email: rawEmail, password, name: rawName }) => {
 
   const passwordHash = await hashPassword(password); // always hash: equalises timing
 
+  // Test deployments only: skip the verification mail and mark the account verified at sign-up.
+  const autoVerify = process.env.AUTO_VERIFY_EMAIL === 'true';
+
   let user;
   try {
     const { rows } = await pool.query(
-      `INSERT INTO users (id, email, name, password_hash, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, NOW(), NOW())
+      `INSERT INTO users (id, email, name, password_hash, email_verified_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
        ON CONFLICT (email) DO UPDATE
-              SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash, updated_at = NOW()
+              SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash,
+                  email_verified_at = EXCLUDED.email_verified_at, updated_at = NOW()
             WHERE users.email_verified_at IS NULL
         RETURNING id, email, name`,
-      [uuidv4(), email, name, passwordHash],
+      [uuidv4(), email, name, passwordHash, autoVerify ? new Date() : null],
     );
     user = rows[0];
     if (user) await revokeAllSessions(user.id); // refreshing an unverified account kills any old sessions
@@ -76,7 +80,7 @@ const register = async ({ email: rawEmail, password, name: rawName }) => {
     if (err.code !== '23505') throw err; // case-variant duplicate etc.: treat as "already registered"
   }
 
-  if (user) {
+  if (user && !autoVerify) {
     const token = await createAndSendToken(pool, user, 'verify_email');
     await sendQuietly(() => mailer.sendVerificationEmail(user.email, token), 'verification');
   }
