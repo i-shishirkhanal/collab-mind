@@ -27,7 +27,7 @@ youtube-transcript-api>=1.0.0,<2
 
 # ── LangGraph / LangChain (agent framework) ────────────────────────────────────
 langgraph>=1.2.11,<2  # Graph-based agent runtime
-langchain>=1.3.17,<2  # Core LangChain abstractions
+langchain>=1.4.3,<2  # Core LangChain abstractions
 langchain-openai>=1.6.7,<2  # LangChain ↔ DeepSeek (OpenAI-compatible API) for the ReAct agent
 
 # ── Utilities ──────────────────────────────────────────────────────────────────
