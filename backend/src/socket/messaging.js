@@ -72,6 +72,7 @@ const registerMessagingSocket = (io, socket) => {
       const online = new Set(sockets.filter((s) => s.data?.messaging).map((s) => s.data.userId));
       ack({ onlineUserIds: [...online] });
     } catch (err) {
+      console.warn(`[Messaging] presence:query failed for ${userId}: ${err.message}`);
       ack({ onlineUserIds: [], error: err.message });
     }
   });
