@@ -1,29 +1,31 @@
 # Python dependencies for the CollabMind AI service
 # Install everything with:  pip install -r requirements.txt
+# Each range starts at the version the test suite last passed on and stops before the next major
+# release. For fully reproducible images generate a hashed lock: pip-compile --generate-hashes.
 
 # ── Web framework ──────────────────────────────────────────────────────────────
-fastapi>=0.110.0            # The web framework
-uvicorn[standard]>=0.29.0   # ASGI server that runs FastAPI (like Node's Express server)
+fastapi>=0.141.1,<1  # The web framework
+uvicorn[standard]>=0.40.0,<1  # ASGI server that runs FastAPI (like Node's Express server)
 
 # ── Database ───────────────────────────────────────────────────────────────────
-asyncpg>=0.29.0             # Async PostgreSQL driver — much faster than psycopg2 for async code
+asyncpg>=0.31.0,<1  # Async PostgreSQL driver — much faster than psycopg2 for async code
 
 # ── Storage ───────────────────────────────────────────────────────────────────
-google-cloud-storage>=2.16.0 # GCS client for downloading source files (storage only; no Gemini)
+google-cloud-storage>=3.4.1,<4  # GCS client for downloading source files (storage only; no Gemini)
 
 # ── Tokenization & document extraction ─────────────────────────────────────────
-tiktoken>=0.7.0             # Fast BPE tokenizer — used to count tokens for chunking
+tiktoken>=0.14.0,<1  # Fast BPE tokenizer — used to count tokens for chunking
 # Microsoft MarkItDown (MIT) converts PDF / DOCX / PPTX / XLSX / XLS / HTML / CSV
 # etc. to markdown; rag/extractor.py wraps it. Only the extras we use are installed
 # (no audio, Azure or Outlook extras).
 markitdown[pdf,docx,pptx,xlsx,xls]==0.1.8
 
 # ── LangGraph / LangChain (agent framework) ────────────────────────────────────
-langgraph>=0.1.0                       # Graph-based agent runtime
-langchain>=0.2.0                       # Core LangChain abstractions
-langchain-openai>=0.2.0                # LangChain ↔ DeepSeek (OpenAI-compatible API) for the ReAct agent
+langgraph>=1.2.11,<2  # Graph-based agent runtime
+langchain>=1.3.17,<2  # Core LangChain abstractions
+langchain-openai>=1.6.7,<2  # LangChain ↔ DeepSeek (OpenAI-compatible API) for the ReAct agent
 
 # ── Utilities ──────────────────────────────────────────────────────────────────
-python-dotenv>=1.0.0        # Loads .env file into os.environ automatically
-redis[asyncio]>=5.0.0       # Async pub/sub and KV store for agent statuses
-httpx>=0.27.0                # HTTP client: DeepSeek chat, BGE-M3 embeddings, URL sources
+python-dotenv>=1.2.1,<2  # Loads .env file into os.environ automatically
+redis[asyncio]>=8.1.0,<9  # Async pub/sub and KV store for agent statuses
+httpx>=0.28.1,<1  # HTTP client: DeepSeek chat, BGE-M3 embeddings, URL sources

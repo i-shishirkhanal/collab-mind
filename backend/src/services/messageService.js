@@ -207,16 +207,30 @@ const getAttachmentUrl = async (conversationId, messageId, userId) => {
   return { url, expires_in: 300 };
 };
 
-/** Soft delete; only the sender can delete their own message. */
+/**
+ * Delete a message; only the sender can delete their own. The row stays (so replies and read pointers keep
+ * working) but its text and attachment are erased, and the stored file is removed.
+ */
 const deleteMessage = async (conversationId, messageId, userId) => {
   await assertMember(conversationId, userId);
-  const { rowCount } = await pool.query(
-    `UPDATE messages SET deleted_at = NOW()
-      WHERE id = $1 AND conversation_id = $2 AND sender_id = $3
-        AND deleted_at IS NULL AND kind <> 'system'`,
+  const { rows } = await pool.query(
+    `WITH target AS (
+       SELECT id, attachment_path FROM messages
+        WHERE id = $1 AND conversation_id = $2 AND sender_id = $3
+          AND deleted_at IS NULL AND kind <> 'system'
+          FOR UPDATE
+     ), erased AS (
+       UPDATE messages m
+          SET deleted_at = NOW(), body = '', attachment_path = NULL, attachment_name = NULL,
+              attachment_type = NULL, attachment_size = NULL
+         FROM target t WHERE m.id = t.id
+     RETURNING t.attachment_path AS old_path
+     )
+     SELECT old_path FROM erased`,
     [messageId, conversationId, userId],
   );
-  if (rowCount === 0) throw httpError(404, 'Message not found');
+  if (rows.length === 0) throw httpError(404, 'Message not found');
+  await chatStorage.removeObjects([rows[0].old_path]);
   realtime.emitToConversation(conversationId, 'message:deleted', { conversationId, messageId });
   return { ok: true };
 };

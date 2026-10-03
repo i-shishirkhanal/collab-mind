@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { LocalParticipant, Participant, RemoteParticipant, Room, RoomEvent, Track } from "livekit-client";
-import { Loader2, Mic, MicOff, Monitor, MonitorOff, PhoneOff, Video, VideoOff, Users } from "lucide-react";
+import { Loader2, Maximize2, Mic, MicOff, Minimize2, Monitor, MonitorOff, PhoneOff, Video, VideoOff, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Initials } from "./Initials";
@@ -62,13 +62,12 @@ function Tile({ participant, isLocal }: { participant: Participant; isLocal: boo
       ) : (
         <Initials name={name} className="w-20 h-20 text-lg" />
       )}
-      {!isLocal && <RemoteAudio participant={participant} />}
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
         <span className="px-2 py-1 rounded-md bg-black/60 text-xs text-white truncate">
           {name}{isLocal ? " (you)" : ""}
         </span>
         {!micOn && (
-          <span className="p-1 rounded-md bg-red-500/80 text-white" title="Muted">
+          <span className="p-1 rounded-md bg-red-500/80 text-slate-50" title="Muted">
             <MicOff className="w-3.5 h-3.5" />
           </span>
         )}
@@ -97,6 +96,10 @@ export function CallRoom({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [minimized, setMinimized] = useState(false);
+  // Offset of the floating window from its default bottom-right spot (px, negative = left/up).
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
   const wantsVideo = call.kind === "video";
 
   useEffect(() => {
@@ -174,8 +177,86 @@ export function CallRoom({
     }
   }, [room]);
 
+  const onDragStart = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    drag.current = { px: e.clientX, py: e.clientY, ox: offset.x, oy: offset.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onDragMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    // Keep at least part of the window on screen.
+    const maxX = window.innerWidth - 120;
+    const maxY = window.innerHeight - 80;
+    setOffset({
+      x: Math.min(Math.max(d.ox + e.clientX - d.px, -maxX), 0),
+      y: Math.min(Math.max(d.oy + e.clientY - d.py, -maxY), 0),
+    });
+  };
+  const onDragEnd = () => { drag.current = null; };
+
   const canShareScreen = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
   const connecting = phase === "connecting";
+
+  const audio = remotes.map((p) => <RemoteAudio key={p.sid || p.identity} participant={p} />);
+  const focus = sharer ?? remotes[0] ?? local;
+
+  if (minimized) {
+    return (
+      <div
+        role="dialog"
+        aria-label={`Call: ${title} (minimized)`}
+        style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+        className="fixed z-[60] bottom-4 right-4 w-64 rounded-2xl overflow-hidden bg-slate-900 border border-slate-700 shadow-2xl text-slate-50"
+      >
+        {audio}
+        <div
+          onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}
+          className="px-3 py-2 flex items-center justify-between gap-2 cursor-move touch-none bg-slate-900 border-b border-slate-800"
+        >
+          <div className="min-w-0">
+            <div className="text-sm font-semibold truncate">{title}</div>
+            <div className="text-[11px] text-slate-400">
+              {phase === "connected" ? formatElapsed(elapsed) : phase === "reconnecting" ? "Reconnecting…" : phase === "failed" ? "Failed" : "Connecting…"}
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="Expand call" title="Expand" onClick={() => setMinimized(false)} className="text-slate-300 hover:text-slate-50">
+            <Maximize2 className="w-4 h-4" />
+          </Button>
+        </div>
+        {phase === "connected" && focus && (
+          <div className="p-2">
+            {sharer ? (
+              <TrackMedia participant={sharer} source={Track.Source.ScreenShare} muted className="w-full rounded-lg bg-black object-contain max-h-36" />
+            ) : (
+              <Tile participant={focus} isLocal={focus.isLocal} />
+            )}
+          </div>
+        )}
+        <div className="px-2 pb-2 flex items-center justify-center gap-2">
+          <Button
+            variant="outline" size="icon" aria-label={local?.isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}
+            onClick={() => toggle("mic")} disabled={phase === "failed" || connecting}
+            className={cn("rounded-full border-slate-700", !local?.isMicrophoneEnabled && "bg-red-500/20 text-red-400 border-red-500/40")}
+          >
+            {local?.isMicrophoneEnabled ? <Mic /> : <MicOff />}
+          </Button>
+          {wantsVideo && (
+            <Button
+              variant="outline" size="icon" aria-label={local?.isCameraEnabled ? "Turn camera off" : "Turn camera on"}
+              onClick={() => toggle("cam")} disabled={phase === "failed" || connecting}
+              className={cn("rounded-full border-slate-700", !local?.isCameraEnabled && "bg-slate-800 text-slate-300")}
+            >
+              {local?.isCameraEnabled ? <Video /> : <VideoOff />}
+            </Button>
+          )}
+          <Button onClick={onLeave} aria-label="Leave call" size="icon" className="rounded-full bg-red-600 hover:bg-red-700 text-white">
+            <PhoneOff />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-950 flex flex-col text-slate-50" role="dialog" aria-label={`Call: ${title}`}>
@@ -189,7 +270,11 @@ export function CallRoom({
             <span className="flex items-center gap-1"><Users className="w-3 h-3" />{everyone.length || 1}</span>
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setMinimized(true)} className="border-slate-700 text-slate-200 gap-1.5" title="Shrink the call so you can keep reading">
+          <Minimize2 className="w-4 h-4" /> Minimize
+        </Button>
       </header>
+      {audio}
 
       <main className="flex-1 min-h-0 overflow-y-auto p-3 md:p-6">
         {phase === "failed" ? (

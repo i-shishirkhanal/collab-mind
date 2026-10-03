@@ -86,6 +86,17 @@ const makeUser = async (label) => {
   return { email, token: login.body.token, id: login.body.user.id, name: label };
 };
 
+/** Invite by email and have the invitee accept: the only way into a workspace. */
+const addMemberTo = async (owner, W, member, role) => {
+  const sent = await call('POST', `/api/workspaces/${W}/members`, { token: owner.token, body: { email: member.email, ...(role ? { role } : {}) } });
+  assert.equal(sent.status, 202);
+  const invite = (await call('GET', '/api/invites', { token: member.token })).body.find((i) => i.workspace_id === W);
+  assert.ok(invite, 'invitation is visible to the invitee');
+  const accepted = await call('POST', `/api/invites/${invite.id}/accept`, { token: member.token });
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.body.workspace_id, W);
+};
+
 before(async () => {
   await new Promise((r) => fakeAi.listen(0, '127.0.0.1', r));
   process.env.AI_SERVICE_URL = `http://127.0.0.1:${fakeAi.address().port}`;
@@ -98,6 +109,7 @@ before(async () => {
   app.use('/api/workspaces', require('../src/routes/sources'));
   app.use('/api/workspaces', require('../src/routes/chat'));
   app.use('/api/workspaces', require('../src/routes/agents'));
+  app.use('/api/invites', require('../src/routes/invites'));
   app.use(notFound);
   app.use(errorHandler);
   server = http.createServer(app);
@@ -278,6 +290,127 @@ describe('email authentication', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+describe('account lifecycle', () => {
+  const NEW_PASSWORD = 'another perfectly good passphrase';
+  const login = (email, password) => call('POST', '/api/auth/login', { body: { email, password } });
+
+  test('change password: needs the current password, keeps this session, signs out the others', async () => {
+    const u = await makeUser('chg');
+    const other = (await login(u.email, PASSWORD)).body.token; // a second session
+    const wrong = await call('POST', '/api/auth/change-password', { token: u.token, body: { currentPassword: 'nope nope nope', newPassword: NEW_PASSWORD } });
+    assert.equal(wrong.status, 403);
+    const weak = await call('POST', '/api/auth/change-password', { token: u.token, body: { currentPassword: PASSWORD, newPassword: 'short' } });
+    assert.equal(weak.status, 400);
+    const same = await call('POST', '/api/auth/change-password', { token: u.token, body: { currentPassword: PASSWORD, newPassword: PASSWORD } });
+    assert.equal(same.status, 400);
+
+    const ok = await call('POST', '/api/auth/change-password', { token: u.token, body: { currentPassword: PASSWORD, newPassword: NEW_PASSWORD } });
+    assert.equal(ok.status, 200);
+    assert.equal((await call('GET', '/api/auth/me', { token: u.token })).status, 200, 'current session survives');
+    assert.equal((await call('GET', '/api/auth/me', { token: other })).status, 401, 'other session is revoked');
+    assert.equal((await login(u.email, PASSWORD)).status, 401);
+    assert.equal((await login(u.email, NEW_PASSWORD)).status, 200);
+  });
+
+  test('sign out everywhere revokes every session including this one', async () => {
+    const u = await makeUser('all');
+    const other = (await login(u.email, PASSWORD)).body.token;
+    assert.equal((await call('POST', '/api/auth/logout-all', { token: u.token })).status, 204);
+    assert.equal((await call('GET', '/api/auth/me', { token: u.token })).status, 401);
+    assert.equal((await call('GET', '/api/auth/me', { token: other })).status, 401);
+  });
+
+  test('account endpoints require authentication', async () => {
+    assert.equal((await call('POST', '/api/auth/change-password', { body: {} })).status, 401);
+    assert.equal((await call('POST', '/api/auth/logout-all')).status, 401);
+    assert.equal((await call('DELETE', '/api/auth/account', { body: {} })).status, 401);
+  });
+
+  test('delete account: needs the password; removes the user and a workspace only they belong to', async () => {
+    const u = await makeUser('del');
+    const W = (await call('POST', '/api/workspaces', { token: u.token, body: { name: 'solo' } })).body.id;
+    assert.equal((await call('DELETE', '/api/auth/account', { token: u.token, body: { password: 'wrong wrong wrong' } })).status, 403);
+    assert.equal((await call('DELETE', '/api/auth/account', { token: u.token, body: { password: PASSWORD } })).status, 204);
+    assert.equal((await call('GET', '/api/auth/me', { token: u.token })).status, 401);
+    assert.equal((await login(u.email, PASSWORD)).status, 401);
+    const { rows } = await pool.query('SELECT 1 FROM workspaces WHERE id = $1', [W]);
+    assert.equal(rows.length, 0, 'solo workspace is deleted with its owner');
+  });
+
+  test('delete account is refused while the user owns a workspace that has other members', async () => {
+    const owner = await makeUser('own'); const member = await makeUser('mem');
+    const W = (await call('POST', '/api/workspaces', { token: owner.token, body: { name: 'shared' } })).body.id;
+    await addMemberTo(owner, W, member);
+    const refused = await call('DELETE', '/api/auth/account', { token: owner.token, body: { password: PASSWORD } });
+    assert.equal(refused.status, 409);
+    assert.equal(refused.body.code, 'OWNS_SHARED_WORKSPACES');
+    assert.equal((await call('GET', '/api/auth/me', { token: owner.token })).status, 200, 'nothing was deleted');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+describe('workspace invitations', () => {
+  let owner; let guest; let stranger; let W;
+  before(async () => {
+    owner = await makeUser('invo'); guest = await makeUser('invg'); stranger = await makeUser('invs');
+    W = (await call('POST', '/api/workspaces', { token: owner.token, body: { name: 'invites' } })).body.id;
+  });
+  const invite = (token) => call('GET', '/api/invites', { token }).then((r) => r.body.find((i) => i.workspace_id === W));
+
+  test('an invitation grants nothing until accepted, and only the invitee can answer it', async () => {
+    const sent = await call('POST', `/api/workspaces/${W}/members`, { token: owner.token, body: { email: guest.email } });
+    assert.equal(sent.status, 202);
+    assert.equal((await call('GET', `/api/workspaces/${W}`, { token: guest.token })).status, 403, 'not a member yet');
+    const inv = await invite(guest.token);
+    assert.equal(inv.workspace_name, 'invites');
+    assert.equal((await call('GET', '/api/invites', { token: stranger.token })).body.length, 0, 'invisible to others');
+    assert.equal((await call('POST', `/api/invites/${inv.id}/accept`, { token: stranger.token })).status, 404);
+    assert.equal((await call('POST', `/api/invites/${inv.id}/accept`, { token: guest.token })).status, 200);
+    assert.equal((await call('GET', `/api/workspaces/${W}`, { token: guest.token })).status, 200);
+    assert.equal((await call('POST', `/api/invites/${inv.id}/accept`, { token: guest.token })).status, 404, 'single use');
+  });
+
+  test('plain members do not see other members\' email addresses; owners do', async () => {
+    const asGuest = (await call('GET', `/api/workspaces/${W}/members`, { token: guest.token })).body;
+    assert.ok(asGuest.length >= 2);
+    assert.ok(asGuest.every((m) => m.email === undefined && m.name));
+    const asOwner = (await call('GET', `/api/workspaces/${W}/members`, { token: owner.token })).body;
+    assert.ok(asOwner.every((m) => typeof m.email === 'string'));
+  });
+
+  test('decline and cancel remove the invitation; expired invitations cannot be accepted', async () => {
+    await call('POST', `/api/workspaces/${W}/members`, { token: owner.token, body: { email: stranger.email } });
+    const inv = await invite(stranger.token);
+    const pending = await call('GET', `/api/workspaces/${W}/invites`, { token: owner.token });
+    assert.equal(pending.status, 200);
+    assert.ok(pending.body.some((i) => i.id === inv.id && !('email' in i)));
+    assert.equal((await call('GET', `/api/workspaces/${W}/invites`, { token: guest.token })).status, 403, 'owners only');
+
+    assert.equal((await call('POST', `/api/invites/${inv.id}/decline`, { token: stranger.token })).status, 204);
+    assert.equal(await invite(stranger.token), undefined);
+
+    await call('POST', `/api/workspaces/${W}/members`, { token: owner.token, body: { email: stranger.email } });
+    const again = await invite(stranger.token);
+    assert.equal((await call('DELETE', `/api/workspaces/${W}/invites/${again.id}`, { token: owner.token })).status, 204);
+    assert.equal(await invite(stranger.token), undefined);
+
+    await call('POST', `/api/workspaces/${W}/members`, { token: owner.token, body: { email: stranger.email } });
+    const old = await invite(stranger.token);
+    await pool.query(`UPDATE workspace_invites SET created_at = NOW() - INTERVAL '15 days' WHERE id = $1`, [old.id]);
+    assert.equal(await invite(stranger.token), undefined, 'expired invitations are not listed');
+    assert.equal((await call('POST', `/api/invites/${old.id}/accept`, { token: stranger.token })).status, 404);
+  });
+
+  test('re-inviting an existing member or sending garbage is harmless and answers the same', async () => {
+    assert.equal((await call('POST', `/api/workspaces/${W}/members`, { token: owner.token, body: { email: guest.email } })).status, 202);
+    assert.equal(await invite(guest.token), undefined, 'no invitation for someone already in');
+    assert.equal((await call('POST', `/api/workspaces/${W}/members`, { token: owner.token, body: { email: 12345 } })).status, 400);
+    assert.equal((await call('POST', '/api/invites/not-a-uuid/accept', { token: guest.token })).status, 400);
+    assert.equal((await call('GET', '/api/invites')).status, 401);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 describe('workspace authorization (REST)', () => {
   let alice; let bob; let carol; let dave; let W1; let W2; let src2; let run1; let run2;
 
@@ -285,8 +418,8 @@ describe('workspace authorization (REST)', () => {
     [alice, bob, carol, dave] = [await makeUser('alice'), await makeUser('bob'), await makeUser('carol'), await makeUser('dave')];
     W1 = (await call('POST', '/api/workspaces', { token: alice.token, body: { name: 'W1' } })).body.id;
     W2 = (await call('POST', '/api/workspaces', { token: bob.token, body: { name: 'W2' } })).body.id;
-    assert.equal((await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: carol.email } })).status, 201);
-    assert.equal((await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: dave.email, role: 'admin' } })).status, 201);
+    await addMemberTo(alice, W1, carol);
+    await addMemberTo(alice, W1, dave, 'admin');
 
     src2 = crypto.randomUUID();
     await pool.query(`INSERT INTO sources (id, workspace_id, name, type, status, created_by) VALUES ($1,$2,'secret.pdf','pdf','ready',$3)`, [src2, W2, bob.id]);
@@ -342,10 +475,12 @@ describe('workspace authorization (REST)', () => {
     // owner (alice): allowed; invalid role rejected; unknown/unverified emails -> 404
     assert.equal((await call('PUT', `/api/workspaces/${W1}`, { token: alice.token, body: { description: 'd' } })).status, 200);
     assert.equal((await call('PATCH', `/api/workspaces/${W1}/members/${carol.id}`, { token: alice.token, body: { role: 'superuser' } })).status, 400);
-    assert.equal((await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: 'ghost@example.com' } })).status, 404);
+    assert.equal((await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: 'ghost@example.com' } })).status, 202, 'same answer for unknown addresses');
     const unverified = `unv-${unique()}@example.com`;
     await call('POST', '/api/auth/register', { body: { email: unverified, password: PASSWORD, name: 'u' } });
-    assert.equal((await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: unverified } })).status, 404, 'unverified accounts cannot be added');
+    assert.equal((await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: unverified } })).status, 202, 'same answer for unverified addresses');
+    const pending = await pool.query('SELECT 1 FROM workspace_invites WHERE workspace_id = $1', [W1]);
+    assert.equal(pending.rows.length, 0, 'no invitation is created for unknown or unverified addresses');
     assert.equal((await call('PATCH', `/api/workspaces/${W1}/members/${alice.id}`, { token: alice.token, body: { role: 'member' } })).status, 400, 'no self role change');
   });
 
@@ -417,7 +552,7 @@ describe('workspace authorization (REST)', () => {
   test('last-owner protection holds under concurrent demotion', async () => {
     const x = await makeUser('x'); const y = await makeUser('y');
     const W = (await call('POST', '/api/workspaces', { token: x.token, body: { name: 'race' } })).body.id;
-    assert.equal((await call('POST', `/api/workspaces/${W}/members`, { token: x.token, body: { email: y.email, role: 'owner' } })).status, 201);
+    await addMemberTo(x, W, y, 'owner');
     const results = await Promise.all([
       call('PATCH', `/api/workspaces/${W}/members/${y.id}`, { token: x.token, body: { role: 'member' } }),
       call('PATCH', `/api/workspaces/${W}/members/${x.id}`, { token: y.token, body: { role: 'member' } }),
@@ -450,7 +585,7 @@ describe('Socket.io authorization', () => {
     [alice, bob, carol] = [await makeUser('sa'), await makeUser('sb'), await makeUser('sc')];
     W1 = (await call('POST', '/api/workspaces', { token: alice.token, body: { name: 'SW1' } })).body.id;
     W2 = (await call('POST', '/api/workspaces', { token: bob.token, body: { name: 'SW2' } })).body.id;
-    await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: carol.email } });
+    await addMemberTo(alice, W1, carol).catch(() => {}); // may already be a member from an earlier test
   });
   after(() => sockets.forEach((s) => s.close()));
 
@@ -530,7 +665,7 @@ describe('Socket.io authorization', () => {
 
   test('one socket cannot be re-bound to a second workspace', async () => {
     const a = track(await connect(alice.token));
-    await call('POST', `/api/workspaces/${W1}/members`, { token: alice.token, body: { email: carol.email } }); // idempotent setup
+    await addMemberTo(alice, W1, carol).catch(() => {}); // idempotent setup
     const w3 = (await call('POST', '/api/workspaces', { token: alice.token, body: { name: 'SW3' } })).body.id;
     const j = once(a.socket, 'workspace:joined');
     a.socket.emit('workspace:join_request', { workspaceId: W1 });

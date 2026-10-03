@@ -193,6 +193,63 @@ const resetPassword = async (token, newPassword) => {
   });
 };
 
+/** Verifies the caller's current password (constant-time path for accounts without one). */
+const requireCurrentPassword = async (userId, password) => {
+  const wrong = () => Object.assign(httpError(403, 'Current password is incorrect'), { code: 'INVALID_CREDENTIALS' });
+  if (typeof password !== 'string' || password.length === 0 || password.length > 128) {
+    if (typeof password === 'string') await verifyAgainstDummy(password.slice(0, 128));
+    throw wrong();
+  }
+  const { rows } = await pool.query(`SELECT email, password_hash FROM users WHERE id = $1`, [userId]);
+  const user = rows[0];
+  const ok = user?.password_hash ? await verifyPassword(password, user.password_hash) : await verifyAgainstDummy(password);
+  if (!user || !ok) throw wrong();
+  return user;
+};
+
+/** Changes the password and signs out every OTHER session (this one stays valid). Returns the revoked session ids. */
+const changePassword = async (userId, sessionId, currentPassword, newPassword) => {
+  const user = await requireCurrentPassword(userId, currentPassword);
+  const policyError = passwordPolicyError(newPassword, user.email);
+  if (policyError) throw httpError(400, policyError);
+  if (newPassword === currentPassword) throw httpError(400, 'Choose a password different from the current one');
+  const hash = await hashPassword(newPassword);
+  return inTransaction(async (client) => {
+    await client.query(`UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1`, [userId, hash]);
+    await client.query(`DELETE FROM auth_tokens WHERE user_id = $1 AND used_at IS NULL`, [userId]);
+    return revokeAllSessions(userId, client, sessionId); // ids of the sessions that were signed out
+  });
+};
+
+const signOutEverywhere = (userId) => revokeAllSessions(userId);
+
+/**
+ * Permanently deletes the account after re-checking the password.
+ * Workspaces the user owns alone are deleted with their files; a workspace that still has other members
+ * blocks the deletion (409) so nobody is left without an owner: transfer or remove members first.
+ * Returns the ids of workspaces that were deleted (their stored files are removed afterwards).
+ */
+const deleteAccount = async (userId, password) => {
+  await requireCurrentPassword(userId, password);
+  const { rows: owned } = await pool.query(
+    `SELECT wm.workspace_id,
+            (SELECT COUNT(*) FROM workspace_members o WHERE o.workspace_id = wm.workspace_id AND o.user_id <> $1) AS others
+       FROM workspace_members wm WHERE wm.user_id = $1 AND wm.role = 'owner'`,
+    [userId],
+  );
+  const blocking = owned.filter((w) => Number(w.others) > 0);
+  if (blocking.length > 0) {
+    throw Object.assign(
+      httpError(409, 'You still own workspaces that have other members. Transfer ownership or remove the members first.'),
+      { code: 'OWNS_SHARED_WORKSPACES' },
+    );
+  }
+  const workspaceService = require('./workspaceService');
+  for (const w of owned) await workspaceService.deleteWorkspace(w.workspace_id);
+  await pool.query(`DELETE FROM users WHERE id = $1`, [userId]); // sessions, memberships, tokens cascade
+  return owned.map((w) => w.workspace_id);
+};
+
 const getUserById = async (id) => {
   const { rows } = await pool.query(`SELECT id, email, name, avatar_url FROM users WHERE id = $1`, [id]);
   return rows[0] ? publicUser(rows[0]) : null;
@@ -201,4 +258,5 @@ const getUserById = async (id) => {
 module.exports = {
   normalizeEmail, register, verifyEmail, resendVerification, login,
   requestPasswordReset, resetPassword, getUserById,
+  changePassword, signOutEverywhere, deleteAccount,
 };

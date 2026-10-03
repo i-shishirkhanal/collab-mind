@@ -21,9 +21,9 @@ export const useSocket = (workspaceId?: string) => {
   useEffect(() => {
     if (typeof window === "undefined" || !workspaceId) return;
 
-    const userId = (session as any)?.user?.id;
+    const userId = session?.user?.id;
     // Only a real session token connects; there is no guest/demo fallback.
-    const token = (session as any)?.accessToken;
+    const token = session?.accessToken;
     if (!token) return;
 
     const socket = io(WS_URL, {

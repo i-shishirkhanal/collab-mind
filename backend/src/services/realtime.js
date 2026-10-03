@@ -45,6 +45,13 @@ const disconnectSession = (sessionId) => {
   io.in(`session:${sessionId}`).disconnectSockets(true);
 };
 
+/** Drop every live socket of a user (sign out everywhere, account deletion). */
+const disconnectUser = (userId) => {
+  if (!io || !userId) return;
+  io.in(userRoom(userId)).disconnectSockets(true);
+  io.in(`wsuser:${userId}`).disconnectSockets(true);
+};
+
 /** Remove a user's live sockets from a workspace room (membership revoked). */
 const removeUserFromWorkspaceRoom = (workspaceId, userId) => {
   if (!io) return;
@@ -52,7 +59,7 @@ const removeUserFromWorkspaceRoom = (workspaceId, userId) => {
 };
 
 module.exports = {
-  disconnectSession, removeUserFromWorkspaceRoom, workspaceRoom,
+  disconnectSession, disconnectUser, removeUserFromWorkspaceRoom, workspaceRoom,
   setIo, getIo, userRoom, convRoom,
   emitToConversation, emitToUsers,
   joinUsersToConversation, removeUsersFromConversation, isUserOnline,

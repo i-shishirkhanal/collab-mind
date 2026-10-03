@@ -42,6 +42,32 @@ router.post(
   memberController.addMember,
 );
 
+/** GET /workspaces/:workspaceId/invites: pending invitations (owner only) */
+router.get(
+  '/:workspaceId/invites',
+  authenticate,
+  requireWorkspaceMember,
+  requireRole('owner'),
+  async (req, res, next) => {
+    try { res.json(await require('../services/inviteService').listForWorkspace(req.params.workspaceId)); } catch (err) { next(err); }
+  },
+);
+
+/** DELETE /workspaces/:workspaceId/invites/:inviteId: withdraw an invitation (owner only) */
+router.delete(
+  '/:workspaceId/invites/:inviteId',
+  authenticate,
+  requireWorkspaceMember,
+  requireRole('owner'),
+  async (req, res, next) => {
+    try {
+      if (!isUuid(req.params.inviteId)) return res.status(400).json({ error: 'Invalid inviteId' });
+      await require('../services/inviteService').cancel(req.params.workspaceId, req.params.inviteId);
+      res.status(204).end();
+    } catch (err) { next(err); }
+  },
+);
+
 /**
  * PATCH /workspaces/:workspaceId/members/:userId
  * Change a member's role. Only owners may change roles.

@@ -37,7 +37,7 @@ export function QuizTool({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-sm">
-        <h2 className="text-xl font-semibold text-white mb-4">Generate Practice Quiz</h2>
+        <h2 className="text-xl font-semibold text-slate-50 mb-4">Generate Practice Quiz</h2>
         <div className="space-y-4 max-w-xl">
           <div className="space-y-2">
             <Label htmlFor="q-topic" className="text-slate-300">Topic</Label>
@@ -115,7 +115,7 @@ export function QuizTool({ workspaceId }: { workspaceId: string }) {
                   variant="outline" 
                   size="sm"
                   onClick={() => toggleReveal(i)}
-                  className="shrink-0 border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700"
+                  className="shrink-0 border-slate-600 text-slate-300 hover:text-slate-50 hover:bg-slate-700"
                 >
                   {revealed[i] ? "Hide Answer" : "Reveal Answer"}
                   {revealed[i] ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}

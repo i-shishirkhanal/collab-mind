@@ -102,7 +102,11 @@ const proxyStudio = (endpoint) => async (req, res, next) => {
   try {
     // workspace_id comes LAST so a client-supplied value can never override the
     // workspace the caller was authorised for.
-    const body = { ...(req.body && typeof req.body === 'object' ? req.body : {}), workspace_id: req.params.workspaceId };
+    const body = {
+      ...(req.body && typeof req.body === 'object' ? req.body : {}),
+      workspace_id: req.params.workspaceId,
+      user_id: req.user.id, // usage is attributed to the caller, never to a client-supplied id
+    };
     const response = await aiClient.post(`/studio/${endpoint}`, body, { timeout: 120_000 });
     res.json(response.data);
   } catch (err) {

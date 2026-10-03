@@ -16,16 +16,20 @@ chunks, so 'ready' always means the chunks are really there.
 import asyncio
 import json
 import os
+from typing import Optional
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 import asyncpg
+import httpx
 
 from db import assert_vector_schema
 from llm.errors import EmbeddingUnavailableError
 from rag.chunker import chunk_blocks
 from rag.embedding_provider import get_embedding_client
 from rag.extractor import Block, ExtractionError, extract_blocks, extract_url
+from rag.sandbox import run_isolated
 
 # Uploaded files may only be read from the shared uploads directory, so a
 # crafted storage_url can't make the service index arbitrary files on disk.
@@ -61,11 +65,62 @@ def _read_gcs_file(storage_url: str) -> tuple[bytes, str]:
     return data, object_name.rsplit("/", 1)[-1]
 
 
+SUPABASE_SCHEME = "supabase://sources/"
+
+
+def _read_supabase_file(storage_url: str) -> tuple[bytes, str]:
+    base = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not base or not key:
+        raise ExtractionError("File storage is not configured on this server.")
+    object_path = storage_url.removeprefix(SUPABASE_SCHEME)
+    if ".." in object_path.split("/"):
+        raise ExtractionError("That file location is not allowed.")
+    try:
+        res = httpx.get(
+            f"{base}/storage/v1/object/sources/{quote(object_path)}",
+            headers={"Authorization": f"Bearer {key}", "apikey": key},
+            timeout=60,
+        )
+    except httpx.HTTPError:
+        raise ExtractionError("The uploaded file could not be fetched from storage.")
+    if res.status_code == 404 or res.status_code == 400:
+        raise ExtractionError("The uploaded file could not be found.")
+    if res.status_code != 200:
+        raise ExtractionError("The uploaded file could not be fetched from storage.")
+    if len(res.content) > MAX_FILE_BYTES:
+        raise ExtractionError("That file is too large to process.")
+    return res.content, object_path.rsplit("/", 1)[-1]
+
+
+EXTRACTION_ISOLATION = os.environ.get("EXTRACTION_ISOLATION", "process").lower()  # "process" | "thread"
+_extraction_slots: Optional[asyncio.Semaphore] = None
+
+
+async def _extract(storage_url: str) -> list[Block]:
+    """Parse a source without letting a hostile file take the service down: in a child process that
+    is killed on the deadline (and memory-capped on Linux), with a bounded number running at once.
+    EXTRACTION_ISOLATION=thread keeps the old in-process behaviour (used by the unit tests)."""
+    if EXTRACTION_ISOLATION == "thread":
+        return await asyncio.wait_for(
+            asyncio.to_thread(load_blocks, storage_url), timeout=EXTRACTION_TIMEOUT_SECONDS
+        )
+    global _extraction_slots
+    if _extraction_slots is None:
+        _extraction_slots = asyncio.Semaphore(int(os.environ.get("EXTRACTION_CONCURRENCY", "2")))
+    async with _extraction_slots:
+        return await asyncio.to_thread(run_isolated, storage_url, EXTRACTION_TIMEOUT_SECONDS)
+
+
 def load_blocks(storage_url: str) -> list[Block]:
     """Blocking: fetch + parse a source into location-aware blocks. Raises
     ExtractionError (safe message) when it can't be read."""
     if storage_url.startswith(("http://", "https://")):
         return extract_url(storage_url)
+
+    if storage_url.startswith(SUPABASE_SCHEME):
+        data, filename = _read_supabase_file(storage_url)
+        return extract_blocks(data, filename)
 
     if storage_url.startswith("gs://"):
         data, filename = _read_gcs_file(storage_url)
@@ -166,10 +221,7 @@ async def embed_source(
         client.check_configured()  # fail before doing any work if embeddings are impossible
 
         await _set_stage(pool, workspace_id, source_id, "extracting")
-        blocks = await asyncio.wait_for(
-            asyncio.to_thread(load_blocks, storage_url),
-            timeout=EXTRACTION_TIMEOUT_SECONDS,
-        )
+        blocks = await _extract(storage_url)
 
         await _set_stage(pool, workspace_id, source_id, "chunking")
         chunks = chunk_blocks(blocks)

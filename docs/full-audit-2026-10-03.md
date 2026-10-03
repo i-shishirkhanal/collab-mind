@@ -189,3 +189,39 @@ No `.github/` workflows (tests, audit, lint, image build are manual); backend in
 - Upload a decompression-bomb docx; AI `/chat` latency for other workspaces must not degrade.
 - Two workspaces of different size with the same query; compare recall with and without iterative scans.
 - Re-run `npm audit --omit=dev` (target: 0 critical/high), `pip-audit`, and the full Python/Node/E2E suites in CI.
+
+---
+
+## 7. Remediation status (applied the same day, uncommitted)
+
+**Fixed and verified** (tests/tools in brackets)
+- H-1 chat history returns the newest messages [unit test]; H-2 no DB connection/transaction held across the model call [unit test]; H-3 `render.yaml`, README, `test.sh`, `start.sh` rewritten/fixed [read-only review]; H-4 frontend `npm audit` 30 → **0**, backend 20 → 6 moderate (0 high/critical), Next 16.3.8, Node 22 images [`npm audit`, `tsc`, build].
+- M-1 per-user limits on messaging/attachments/calls/member-add, a general per-IP limit, typing throttles (server and client), `TRUST_PROXY` in compose [unit tests for the limiter]; M-2 Redis timeout with memory fallback [unit test]; M-3 summarize error mapping; M-4 (partial) storage paths hidden, add-member limited, members can leave; M-5 (partial) approval only while awaiting approval, sanitised agent errors; M-6 AI request bounds [pytest]; M-7 Markdown images blocked, plus a study-guide rendering bug (wrong response field) fixed; M-9 wider HNSW search + iterative scans where supported; M-10 (partial) attachment content must match its type [unit test]; M-11 workspace input validation; M-14 security headers/CSP [production build]; M-15 (partial) `/ready`, graceful shutdown, unhandled-rejection logging; L-2 YouTube host check; L-3 failure no longer overwrites a ready source; H-5 (partial) zip-bomb size check before parsing [checked with a stubbed MarkItDown].
+- Tests run after the changes: backend unit suites 59/59 and chat/regression tests 13/13; frontend 15/15, `tsc` clean, lint clean on changed files, production build succeeds; AI schema tests 2/2.
+
+**Not fixed (needs a decision, infrastructure or larger work)**
+H-5 real process isolation for parsing · M-4 invite/accept flow · M-5 durable agent runs and a reaper · M-8 prompt-injection hardening · M-10 attachment cleanup, call-membership re-check, DM block/report · M-12 single migration owner and status CHECKs · M-13 account lifecycle (password change, deletion, session list, MFA) · M-15 CI pipeline and structured logging · Python dependency pinning · "load older messages" control in the chat UI · studio usage attribution per user · L-7 dead supabase code · 6 remaining moderate backend advisories.
+
+**Not run:** backend integration tests (need Postgres/Redis), the rest of the Python suite (dependencies not installed here), Docker bring-up, any live provider call, browser testing of the new UI behaviour.
+
+
+## 8. Second remediation pass (2026-10-03, uncommitted)
+
+**Fixed and verified**
+- Frontend: `npm run lint` 33 errors / 14 warnings -> **0 / 0** (typed NextAuth session via `types/next-auth.d.ts`, `lib/errors.ts`, no `any`); `tsc` clean; dead `lib/supabase/*` and the `@supabase/*` packages removed.
+- Chat UI: **"Load older messages"** control (cursor pagination, scroll position kept); history cursor compares at millisecond precision so no row is skipped (integration test over 120 rows).
+- CI: `.github/workflows/ci.yml` (backend with Postgres+pgvector+Redis and migrations applied, frontend lint/tsc/test/build, AI pytest, `npm audit --audit-level=high`, image builds) and Dependabot.
+- Schema: single owner (`supabase/migrations`); root `migration.sql` deleted; `ensure_schema()` is now a read-only check; status CHECK constraints (`20261003010000`), tested.
+- H-5: extraction runs in a spawned child process with a hard deadline, memory cap (Linux), bounded concurrency (`ai/rag/sandbox.py`).
+- M-5: stuck agent runs are failed by a reaper (`ai/agents/reaper.py`, every 5 min, runs older than 30 min).
+- M-4: **invitations** (invite -> accept/decline, identical answer for any address, 14-day expiry, owner can list/cancel); member emails visible to owners/admins only; dashboard and members UI updated.
+- M-8: untrusted-text fencing and a "data, not instructions" rule on studio, report and agent prompts.
+- M-10: deleting a message erases its text and removes the file; the last member leaving a group removes its files; removed members cannot rejoin a call or mint a token and leave live calls; LiveKit tokens 2 h -> 1 h.
+- M-13 (partial): change password (keeps this session, revokes others), sign out everywhere, delete account (blocked while owning a workspace that still has other members) + `/settings` page.
+- M-15: request ids (`X-Request-Id`), JSON access logs in production, request id in 5xx logs/responses; HEALTHCHECK in all three Dockerfiles.
+- M-6: studio/summarize usage is attributed to the calling user; Python dependencies bounded to tested majors.
+
+**Verified (run today):** backend 117/117 (with Postgres+pgvector and Redis in Docker, all migrations applied), AI 256 passed / 12 skipped without a database (263 / 2 with one), frontend lint/tsc/15 tests clean.
+
+**Still open (needs a decision or external setup)**
+MFA / breached-password check · DM block/report/mute · attachment malware scanning · prompt-injection evaluation set (semantic citation checks) · per-workspace spend cap · hashed Python lockfile (`pip-compile --generate-hashes`) · pgvector recall test across large tenants · 6 moderate backend advisories · Windows has no memory cap for the extraction child · E2E (`e2e/`) and live-provider runs were not executed · the CI workflow itself has not run on GitHub.

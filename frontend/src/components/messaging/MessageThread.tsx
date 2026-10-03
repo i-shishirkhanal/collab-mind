@@ -213,7 +213,7 @@ export function MessageThread({ conversationId }: { conversationId: string }) {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
       <header className="h-16 shrink-0 px-3 sm:px-4 flex items-center gap-3 border-b border-slate-800/60 bg-slate-900/60">
-        <Link href="/messages" aria-label="Back to conversations" className="md:hidden p-2 -ml-1 text-slate-400 hover:text-white">
+        <Link href="/messages" aria-label="Back to conversations" className="md:hidden p-2 -ml-1 text-slate-400 hover:text-slate-50">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         {isGroup ? (
@@ -224,7 +224,7 @@ export function MessageThread({ conversationId }: { conversationId: string }) {
           <Initials name={d.title} src={d.avatar} online={otherOnline} />
         )}
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-white truncate">{d.title}</div>
+          <div className="font-semibold text-slate-50 truncate">{d.title}</div>
           <div className="text-xs text-slate-400 truncate">
             {typingNames.length > 0
               ? <span className="text-indigo-300">{typingNames.join(", ")} {typingNames.length > 1 ? "are" : "is"} typing…</span>
@@ -232,10 +232,10 @@ export function MessageThread({ conversationId }: { conversationId: string }) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-lg" aria-label="Start voice call" title="Voice call" disabled={callsBlocked} onClick={() => startCall(conversationId, "audio")} className="text-slate-300 hover:text-white"><Phone /></Button>
-          <Button variant="ghost" size="icon-lg" aria-label="Start video call" title="Video call" disabled={callsBlocked} onClick={() => startCall(conversationId, "video")} className="text-slate-300 hover:text-white"><Video /></Button>
+          <Button variant="ghost" size="icon-lg" aria-label="Start voice call" title="Voice call" disabled={callsBlocked} onClick={() => startCall(conversationId, "audio")} className="text-slate-300 hover:text-slate-50"><Phone /></Button>
+          <Button variant="ghost" size="icon-lg" aria-label="Start video call" title="Video call" disabled={callsBlocked} onClick={() => startCall(conversationId, "video")} className="text-slate-300 hover:text-slate-50"><Video /></Button>
           {isGroup && (
-            <Button variant="ghost" size="icon-lg" aria-label="Group details" title="Group details" onClick={() => setDetailsOpen(true)} className="text-slate-300 hover:text-white"><Info /></Button>
+            <Button variant="ghost" size="icon-lg" aria-label="Group details" title="Group details" onClick={() => setDetailsOpen(true)} className="text-slate-300 hover:text-slate-50"><Info /></Button>
           )}
         </div>
       </header>

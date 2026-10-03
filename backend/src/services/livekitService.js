@@ -6,7 +6,7 @@ const { httpError } = require('../utils/http');
  * secret, so we mint them with `jsonwebtoken` (already a dependency) instead
  * of pulling in the server SDK. The secret only ever lives in backend env.
  */
-const TOKEN_TTL = '2h';
+const TOKEN_TTL = '1h'; // a removed member's token stops working within the hour; /token issues fresh ones
 
 const config = () => ({
   url: process.env.LIVEKIT_URL,

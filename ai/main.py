@@ -4,6 +4,7 @@ main.py — FastAPI application entry point for the CollabMind AI service.
 
 import json
 import logging
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -37,6 +38,7 @@ from rag.embedder import embed_source
 from rag.pipeline import RagResult, run_rag_pipeline, stream_rag_pipeline
 from rag import generator
 from agents.study_coach import StudyCoachAgent
+from agents.reaper import reaper_loop
 from agents.runner import run_study_coach_background
 
 log = logging.getLogger("collabmind.ai")
@@ -56,9 +58,12 @@ async def lifespan(app: FastAPI):
     await ensure_schema(pool)
 
     app.state.study_coach = StudyCoachAgent(pool)
+    reaper = asyncio.create_task(reaper_loop(pool))
 
     yield
 
+    reaper.cancel()
+    await asyncio.gather(reaper, return_exceptions=True)
     await close_pool()
     await close_redis()
 

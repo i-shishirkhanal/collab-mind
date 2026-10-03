@@ -56,8 +56,8 @@ export function CallHistory() {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
       <header className="h-16 shrink-0 px-4 flex items-center gap-3 border-b border-slate-800/60 bg-slate-900/60">
-        <Link href="/messages" aria-label="Back" className="md:hidden p-2 -ml-1 text-slate-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></Link>
-        <h2 className="font-semibold text-white">Call history</h2>
+        <Link href="/messages" aria-label="Back" className="md:hidden p-2 -ml-1 text-slate-400 hover:text-slate-50"><ArrowLeft className="w-5 h-5" /></Link>
+        <h2 className="font-semibold text-slate-50">Call history</h2>
       </header>
       <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6">
         <div className="max-w-2xl mx-auto">

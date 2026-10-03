@@ -146,7 +146,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
       <div className="max-w-5xl mx-auto space-y-10">
         
         <div>
-          <h1 className="text-2xl font-serif font-semibold text-white tracking-tight">Sources</h1>
+          <h1 className="text-2xl font-serif font-semibold text-slate-50 tracking-tight">Sources</h1>
           <p className="text-sm text-slate-400 mt-1">Manage, index, and summarize the documents that power your workspace AI context.</p>
         </div>
 
@@ -260,7 +260,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl relative animate-in zoom-in-95 duration-200">
             <button 
               onClick={() => setActiveSummary(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800"
             >
               <X className="w-5 h-5" />
             </button>
@@ -269,7 +269,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
               <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
                 <Sparkles className="w-4 h-4" /> AI Document Summary
               </div>
-              <h2 className="text-xl font-bold text-white truncate max-w-[85%]">{activeSummary.source_name}</h2>
+              <h2 className="text-xl font-bold text-slate-50 truncate max-w-[85%]">{activeSummary.source_name}</h2>
               {activeSummary.word_count > 0 && (
                 <span className="text-xs text-slate-500">{activeSummary.word_count} total words indexed</span>
               )}
@@ -297,7 +297,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
-              <Button onClick={copyToClipboard} variant="outline" className="border-slate-700 text-slate-300 hover:text-white">
+              <Button onClick={copyToClipboard} variant="outline" className="border-slate-700 text-slate-300 hover:text-slate-50">
                 {copied ? <Check className="w-4 h-4 mr-2 text-emerald-400" /> : <Copy className="w-4 h-4 mr-2" />}
                 {copied ? "Copied!" : "Copy Summary"}
               </Button>

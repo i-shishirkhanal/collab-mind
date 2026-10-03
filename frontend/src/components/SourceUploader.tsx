@@ -5,7 +5,6 @@ import { UploadCloud, Link as LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadFile, addUrl } from "@/lib/api";
-import { useWorkspaceStore } from "@/lib/store";
 import { ALLOWED_EXTENSIONS, describeUploadError, validateSourceFile } from "@/lib/sourceFiles";
 
 export function SourceUploader({ workspaceId }: { workspaceId: string }) {

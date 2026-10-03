@@ -3,7 +3,7 @@ thresholds, hybrid search, schema guard). Skipped unless TEST_DATABASE_URL point
 at a disposable database that already has the CollabMind schema + pgvector, e.g.
 
     docker run -d --rm -p 127.0.0.1:55873:5432 -e POSTGRES_PASSWORD=test -e POSTGRES_DB=cm ankane/pgvector
-    # apply migration.sql (or the supabase migrations), then:
+    # apply the supabase/migrations, then:
     TEST_DATABASE_URL=postgresql://postgres:test@127.0.0.1:55873/cm pytest tests/test_retrieval_db.py
 
 The tests create and delete their own rows (random UUIDs) and never touch others."""

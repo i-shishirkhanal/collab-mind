@@ -285,6 +285,7 @@ const removeMember = async (conversationId, actorId, targetId) => {
   const isSelf = actorId === targetId;
   if (!isSelf && actor.role !== 'admin') throw httpError(403, 'Only group admins can remove members');
 
+  let orphanedFiles = [];
   const conversationDeleted = await withTransaction(async (client) => {
     // Lock the membership rows so concurrent admin changes can't strand a group with no admin.
     const { rows: members } = await client.query(
@@ -301,6 +302,12 @@ const removeMember = async (conversationId, actorId, targetId) => {
     );
     const remaining = members.filter((m) => m.user_id !== targetId);
     if (remaining.length === 0) {
+      // Messages cascade with the conversation; remember their files so storage is cleaned up afterwards.
+      const { rows: files } = await client.query(
+        'SELECT attachment_path FROM messages WHERE conversation_id = $1 AND attachment_path IS NOT NULL',
+        [conversationId],
+      );
+      orphanedFiles = files.map((f) => f.attachment_path);
       await client.query('DELETE FROM conversations WHERE id = $1', [conversationId]);
       return true;
     }
@@ -320,6 +327,8 @@ const removeMember = async (conversationId, actorId, targetId) => {
 
   realtime.emitToUsers([targetId], 'conversation:removed', { conversationId });
   realtime.removeUsersFromConversation([targetId], conversationId);
+  if (conversationDeleted) await require('./chatStorage').removeObjects(orphanedFiles);
+  else await require('./callService').dropUserFromLiveCalls(conversationId, targetId); // lazy: callService requires this module
   if (!conversationDeleted) {
     realtime.emitToConversation(conversationId, 'conversation:updated', { conversationId });
   }

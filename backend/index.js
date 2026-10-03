@@ -14,6 +14,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { requestLog } = require('./src/middleware/requestLog');
 
 // ── Route imports ──────────────────────────────────────────────────────────────
 const authRoutes      = require('./src/routes/auth');
@@ -38,7 +39,8 @@ require('./src/services/agentSubscriber').initAgentSubscriber(io);
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 app.use(helmet());                          // Secure HTTP headers
 app.use(cors({ origin: config.corsOrigins() })); // Explicit origin allow-list (CORS_ORIGINS)
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev')); // Request logging
+app.use(requestLog());                      // Request id + JSON access log in production
+if (process.env.NODE_ENV !== 'production') app.use(morgan('dev')); // Readable request log for development
 app.use(express.json({ limit: '100kb' }));  // Parse JSON bodies
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
@@ -67,6 +69,7 @@ app.use('/api/workspaces', memberRoutes);   // /api/workspaces/:workspaceId/memb
 app.use('/api/workspaces', sourceRoutes);   // /api/workspaces/:workspaceId/sources
 app.use('/api/workspaces', chatRoutes);     // /api/workspaces/:workspaceId/chat
 app.use('/api/workspaces', require('./src/routes/agents')); // /api/workspaces/:workspaceId/agents and /studio
+app.use('/api/invites',       require('./src/routes/invites'));       // my pending workspace invitations
 app.use('/api/conversations', require('./src/routes/conversations')); // 1:1 + group chat, files, calls per conversation
 app.use('/api/calls',         require('./src/routes/calls'));         // call history + LiveKit token/join/leave
 app.use('/api/users',         require('./src/routes/users'));         // people search (shared workspaces only)

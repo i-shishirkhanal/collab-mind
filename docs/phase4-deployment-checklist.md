@@ -21,7 +21,8 @@ Never run a step against production data without a verified backup and the owner
 6. `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` are baked into the browser bundle at image build time; rebuild the frontend image after changing them.
 
 ## 2. Database migration (destructive for chunks — read first)
-Applies in filename order: `20260807000000_initial_schema`, `20261002000000_messaging_and_calls`, `20261002010000_auth_security_consistency`, `20261002020000_phase3_embeddings_rag`, `20261003000000_phase4_integration_fixes`.
+Applies in filename order: `20260807000000_initial_schema`, `20261002000000_messaging_and_calls`, `20261002010000_auth_security_consistency`, `20261002020000_phase3_embeddings_rag`, `20261003000000_phase4_integration_fixes`, `20261003010000_status_checks`, `20261003020000_workspace_invites`.
+* The last two are additive (status CHECKs on `sources`/`agent_runs`, normalising legacy `error` to `failed`; the `workspace_invites` table). **Apply them before deploying this version**: the backend's invite endpoints need the table, and the AI service no longer creates schema objects at boot (it only checks them).
 * All are idempotent; the Phase 3 one **deletes every row of `source_chunks`** (old 768-d vectors cannot be converted), flags the affected `ready` sources `failed` + `needs_reindex`, and resizes the column to `vector(1024)`. Source rows and files are kept.
 * Phase 1's migration normalises e-mail case and role values; existing accounts have no password and must use "Forgot password" once.
 * Phase 4's enables RLS on the core tables (no policies; the backend/AI connect as the table owner and are unaffected). **If your DB role is not the table owner and does not have BYPASSRLS, the application will see zero rows** — check `select rolbypassrls from pg_roles where rolname = current_user` (Supabase `postgres` has it).

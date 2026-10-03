@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
+const sourceStorage = require('./sourceStorage');
 
 /**
  * storageService.js
@@ -58,7 +59,12 @@ const uploadFileBuffer = async (workspaceId, fileBuffer, originalName, mimeType)
     }
   }
 
-  // 2. Local disk fallback for dev/testing environments
+  // 2. Supabase Storage (shared with the AI service, which downloads by the same URI)
+  if (sourceStorage.isConfigured()) {
+    return sourceStorage.upload(relativePath, fileBuffer, mimeType);
+  }
+
+  // 3. Local disk fallback for dev/testing environments
   const root = uploadsDir();
   const fullPath = path.resolve(root, relativePath);
   if (!fullPath.startsWith(root + path.sep)) {
@@ -82,6 +88,8 @@ const deleteStoredFile = async (storageUrl) => {
     if (storageUrl.startsWith('gs://')) {
       const [bucket, ...rest] = storageUrl.slice(5).split('/');
       await storage.bucket(bucket).file(rest.join('/')).delete({ ignoreNotFound: true });
+    } else if (storageUrl.startsWith(sourceStorage.SCHEME)) {
+      await sourceStorage.remove(storageUrl);
     } else if (storageUrl.startsWith('local://')) {
       const root = uploadsDir();
       const target = path.resolve(storageUrl.slice('local://'.length));

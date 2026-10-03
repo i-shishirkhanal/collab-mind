@@ -1,4 +1,5 @@
 const memberService = require('../services/memberService');
+const inviteService = require('../services/inviteService');
 const { removeUserFromWorkspaceRoom } = require('../services/realtime');
 
 /**
@@ -8,7 +9,9 @@ const { removeUserFromWorkspaceRoom } = require('../services/realtime');
 const listMembers = async (req, res, next) => {
   try {
     const members = await memberService.listMembers(req.params.workspaceId);
-    res.json(members);
+    // Email addresses are for owners and admins only; other members see names.
+    const privileged = ['owner', 'admin'].includes(req.membership && req.membership.role);
+    res.json(privileged ? members : members.map(({ email, ...rest }) => rest));
   } catch (err) {
     next(err);
   }
@@ -17,7 +20,7 @@ const listMembers = async (req, res, next) => {
 /**
  * addMember — POST /workspaces/:workspaceId/members
  * Body: { email: string, role?: 'member' | 'admin' | 'owner' }
- * Requires owner role.
+ * Requires owner role. Sends an invitation (always 202); the invitee accepts via /api/invites.
  */
 const addMember = async (req, res, next) => {
   try {
@@ -32,11 +35,15 @@ const addMember = async (req, res, next) => {
       return res.status(400).json({ error: `role must be one of: ${validRoles.join(', ')}` });
     }
 
-    const membership = await memberService.addMember(req.params.workspaceId, email, role);
-    res.status(201).json(membership);
+    if (typeof email !== 'string' || email.length > 320) {
+      return res.status(400).json({ error: 'email must be a valid address' });
+    }
+
+    // An invitation, not an instant membership; the answer is identical whether or not the address is
+    // registered or already a member.
+    await inviteService.createInvite(req.params.workspaceId, req.user.id, email, role);
+    res.status(202).json({ message: 'If that address belongs to a CollabMind account, an invitation has been sent.' });
   } catch (err) {
-    // Propagate known status codes (404 user not found, 409 already member)
-    if (err.status) return res.status(err.status).json({ error: err.message });
     next(err);
   }
 };

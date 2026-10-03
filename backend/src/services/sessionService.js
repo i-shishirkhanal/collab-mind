@@ -83,11 +83,15 @@ const revokeSession = async (sessionId, userId) => {
   );
 };
 
-const revokeAllSessions = async (userId, client = pool) => {
-  await client.query(
-    `UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
-    [userId],
+/** Revokes every live session (optionally keeping one) and returns the revoked session ids. */
+const revokeAllSessions = async (userId, client = pool, exceptSessionId = null) => {
+  const { rows } = await client.query(
+    `UPDATE auth_sessions SET revoked_at = NOW()
+      WHERE user_id = $1 AND revoked_at IS NULL AND ($2::uuid IS NULL OR id <> $2::uuid)
+  RETURNING id`,
+    [userId, exceptSessionId],
   );
+  return rows.map((r) => r.id);
 };
 
 const purgeExpired = async () => {

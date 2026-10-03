@@ -206,6 +206,7 @@ const summarizeSource = async (req, res, next) => {
 
     const response = await aiClient.post('/sources/summarize', {
       workspace_id: workspaceId,
+      user_id: req.user.id,
       source_id: sourceId
     }, { timeout: 120_000 }); // LLM summary of a whole document can exceed the default 30s
     res.json(response.data);

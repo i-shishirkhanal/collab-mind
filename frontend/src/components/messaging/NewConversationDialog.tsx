@@ -63,7 +63,7 @@ export function NewConversationDialog() {
       <DialogTrigger render={<Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" aria-label="New conversation" />}>
         <Plus className="mr-1" /> New
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[440px] bg-slate-900 border-slate-800 text-white">
+      <DialogContent className="sm:max-w-[440px] bg-slate-900 border-slate-800 text-slate-50">
         <DialogHeader>
           <DialogTitle className="text-xl">New conversation</DialogTitle>
           <DialogDescription className="text-slate-400">
@@ -75,7 +75,7 @@ export function NewConversationDialog() {
           {(["direct", "group"] as const).map((m) => (
             <button
               key={m} role="tab" aria-selected={mode === m} type="button" onClick={() => setMode(m)}
-              className={`py-1.5 rounded-md text-sm font-medium transition-colors ${mode === m ? "bg-slate-700 text-white" : "text-slate-400 hover:text-slate-200"}`}
+              className={`py-1.5 rounded-md text-sm font-medium transition-colors ${mode === m ? "bg-slate-700 text-slate-50" : "text-slate-400 hover:text-slate-200"}`}
             >
               {m === "direct" ? "Direct message" : "Group"}
             </button>
@@ -88,7 +88,7 @@ export function NewConversationDialog() {
             <Input
               id="group-name" value={groupName} maxLength={120}
               onChange={(e) => setGroupName(e.target.value)} placeholder="e.g. Project Atlas"
-              className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
             />
             {picked.length > 0 && (
               <div className="flex flex-wrap gap-1.5">

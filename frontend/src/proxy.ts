@@ -28,6 +28,7 @@ export const config = {
     "/dashboard/:path*",
     "/workspace/:path*",
     "/messages/:path*",
+    "/settings/:path*",
     "/auth/signin",
   ],
 };

@@ -127,7 +127,7 @@ export default function WorkspaceOverview({ params }: { params: Promise<{ id: st
     <div className="p-8 h-full overflow-y-auto custom-scrollbar">
       <div className="max-w-5xl mx-auto space-y-8">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-white tracking-tight">
+          <h1 className="text-3xl font-bold text-slate-50 tracking-tight">
             {workspace ? workspace.name : "Workspace Overview"}
           </h1>
           <p className="text-slate-400 mt-2 text-sm">
@@ -139,7 +139,7 @@ export default function WorkspaceOverview({ params }: { params: Promise<{ id: st
           <Card className="bg-slate-900/50 border-slate-800">
             <CardHeader className="pb-2">
               <CardDescription className="font-medium text-slate-400">Total Members</CardDescription>
-              <CardTitle className="text-4xl text-white font-light flex items-center gap-3">
+              <CardTitle className="text-4xl text-slate-50 font-light flex items-center gap-3">
                 {loading ? "-" : mappedMembers.length || 1} <Users className="w-6 h-6 text-indigo-500" />
               </CardTitle>
             </CardHeader>
@@ -148,7 +148,7 @@ export default function WorkspaceOverview({ params }: { params: Promise<{ id: st
           <Card className="bg-slate-900/50 border-slate-800">
             <CardHeader className="pb-2">
               <CardDescription className="font-medium text-slate-400">Indexed Sources</CardDescription>
-              <CardTitle className="text-4xl text-white font-light flex items-center gap-3">
+              <CardTitle className="text-4xl text-slate-50 font-light flex items-center gap-3">
                 {loading ? "-" : sources.length} <FileText className="w-6 h-6 text-emerald-500" />
               </CardTitle>
             </CardHeader>
@@ -157,7 +157,7 @@ export default function WorkspaceOverview({ params }: { params: Promise<{ id: st
           <Card className="bg-slate-900/50 border-slate-800">
             <CardHeader className="pb-2">
               <CardDescription className="font-medium text-slate-400">Chat Messages</CardDescription>
-              <CardTitle className="text-4xl text-white font-light flex items-center gap-3">
+              <CardTitle className="text-4xl text-slate-50 font-light flex items-center gap-3">
                 {loading ? "-" : chatMessages.length} <MessageSquare className="w-6 h-6 text-purple-500" />
               </CardTitle>
             </CardHeader>
@@ -168,7 +168,7 @@ export default function WorkspaceOverview({ params }: { params: Promise<{ id: st
           <div className="lg:col-span-2">
             <Card className="bg-slate-900 border-slate-800 shadow-xl h-full min-h-[400px]">
               <CardHeader>
-                <CardTitle className="text-xl text-white">Recent Activity</CardTitle>
+                <CardTitle className="text-xl text-slate-50">Recent Activity</CardTitle>
                 <CardDescription className="text-slate-400">Latest actions in this workspace.</CardDescription>
               </CardHeader>
               <CardContent>

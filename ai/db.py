@@ -39,53 +39,43 @@ async def get_pool() -> asyncpg.Pool:
     return _pool
 
 
+# Objects the service needs. They are created by supabase/migrations/, the only owner of the
+# schema; the service never runs DDL itself.
+_REQUIRED_COLUMNS = {
+    "source_chunks": ("location_label", "embedding_model", "embedding_dim", "fts"),
+    "agent_runs": ("finished_at",),
+    "llm_usage": ("workspace_id", "total_tokens"),
+}
+
+
 async def ensure_schema(pool: asyncpg.Pool) -> None:
-    """Idempotent column additions so databases created before a feature
-    shipped (migration.sql only runs on first init) pick it up on startup."""
+    """Verify (read-only) that the database matches what the service expects: the migrations have
+    been applied and the pgvector column has the configured embedding dimension. A mismatch sets
+    SCHEMA_PROBLEM, which makes indexing and retrieval fail loudly instead of corrupting data."""
     global SCHEMA_PROBLEM
     expected_dim = get_settings().embedding.dimensions
     async with pool.acquire() as conn:
-        await conn.execute(
-            "ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS location_label TEXT"
-        )
-        # Phase 4: the study-coach graph writes this on completion/failure.
-        await conn.execute("ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ")
-        # Phase 3 additions (same DDL as supabase/migrations/20261002020000_*).
-        await conn.execute("ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS embedding_model TEXT")
-        await conn.execute("ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS embedding_dim INT")
-        await conn.execute(
-            "ALTER TABLE source_chunks ADD COLUMN IF NOT EXISTS fts tsvector "
-            "GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED"
-        )
-        await conn.execute(
-            "CREATE INDEX IF NOT EXISTS index_source_chunks_on_fts ON source_chunks USING gin (fts)"
-        )
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS llm_usage (
-                id BIGSERIAL PRIMARY KEY,
-                workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
-                user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-                kind TEXT NOT NULL, task TEXT NOT NULL,
-                provider TEXT NOT NULL, tier TEXT NOT NULL,
-                model_requested TEXT NOT NULL, model_used TEXT NOT NULL,
-                prompt_tokens INT, completion_tokens INT, total_tokens INT, reasoning_tokens INT,
-                latency_ms INT, attempts INT NOT NULL DEFAULT 1,
-                fallback_used BOOLEAN NOT NULL DEFAULT FALSE, fallback_reason TEXT,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        present = {
+            (r["table_name"], r["column_name"])
+            for r in await conn.fetch(
+                "SELECT table_name, column_name FROM information_schema.columns "
+                "WHERE table_schema = current_schema() AND table_name = ANY($1::text[])",
+                list(_REQUIRED_COLUMNS),
             )
-            """
-        )
-        await conn.execute(
-            "CREATE INDEX IF NOT EXISTS index_llm_usage_workspace ON llm_usage (workspace_id, created_at DESC)"
-        )
-        # pgvector stores the dimension in atttypmod. Never alter it silently:
-        # a mismatch means the (destructive) migration has not been run.
+        }
+        # pgvector stores the dimension in atttypmod.
         actual = await conn.fetchval(
             "SELECT atttypmod FROM pg_attribute "
             "WHERE attrelid = 'source_chunks'::regclass AND attname = 'embedding'"
         )
-    if actual != expected_dim:
+    missing = [f"{t}.{c}" for t, cols in _REQUIRED_COLUMNS.items() for c in cols if (t, c) not in present]
+    if missing:
+        SCHEMA_PROBLEM = (
+            f"database schema is out of date (missing {', '.join(missing)}). "
+            "Apply the migrations in supabase/migrations/."
+        )
+        print(f"[DB] SCHEMA PROBLEM: {SCHEMA_PROBLEM}")
+    elif actual != expected_dim:
         SCHEMA_PROBLEM = (
             f"source_chunks.embedding is vector({actual}) but the embedding model is configured for "
             f"{expected_dim} dimensions. Apply supabase/migrations/20261002020000_phase3_embeddings_rag.sql "

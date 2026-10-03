@@ -20,7 +20,7 @@ export interface WorkspaceMember {
   workspace_id: string;
   role: 'owner' | 'admin' | 'member';
   name: string;
-  email: string;
+  email?: string; // only returned to owners and admins
   online?: boolean;
 }
 
@@ -85,7 +85,7 @@ export interface AgentRun {
   agent_type: string;
   status: 'analyzing' | 'planning' | 'awaiting_approval' | 'generating' | 'done' | 'failed';
   plan?: string;
-  materials?: any;
+  materials?: unknown;
   created_at: string;
 }
 

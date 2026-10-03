@@ -216,6 +216,9 @@ test('errorHandler hides 5xx internals and keeps 4xx messages', () => {
   errorHandler(Object.assign(new Error('relation "users" does not exist at pg:5432'), { code: '42P01' }), { method: 'GET', path: '/x' }, a.res);
   assert.equal(a.o.status, 500);
   assert.deepEqual(a.o.body, { error: 'Internal server error' });
+  const withId = mk();
+  errorHandler(new Error('boom'), { method: 'GET', path: '/x', id: 'req-12345678' }, withId.res);
+  assert.deepEqual(withId.o.body, { error: 'Internal server error', requestId: 'req-12345678' });
   const b = mk();
   errorHandler(Object.assign(new Error('Invalid workspaceId'), { status: 400 }), { method: 'GET', path: '/x' }, b.res);
   assert.equal(b.o.status, 400);

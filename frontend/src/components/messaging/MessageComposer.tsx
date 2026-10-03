@@ -107,7 +107,7 @@ export function MessageComposer({
             <div className="text-indigo-300 font-medium">Replying to {replyTo.sender_name || "message"}</div>
             <div className="truncate">{replyTo.body || replyTo.attachment?.name}</div>
           </div>
-          <button type="button" aria-label="Cancel reply" onClick={onCancelReply} className="p-0.5 hover:text-white"><X className="w-4 h-4" /></button>
+          <button type="button" aria-label="Cancel reply" onClick={onCancelReply} className="p-0.5 hover:text-slate-50"><X className="w-4 h-4" /></button>
         </div>
       )}
       {file && (
@@ -115,7 +115,7 @@ export function MessageComposer({
           <Paperclip className="w-3.5 h-3.5 shrink-0" />
           <span className="truncate flex-1">{file.name}</span>
           <span className="text-slate-500">{formatBytes(file.size)}</span>
-          <button type="button" aria-label="Remove attachment" disabled={uploading} onClick={() => setFile(null)} className="hover:text-white"><X className="w-4 h-4" /></button>
+          <button type="button" aria-label="Remove attachment" disabled={uploading} onClick={() => setFile(null)} className="hover:text-slate-50"><X className="w-4 h-4" /></button>
         </div>
       )}
       {error && <p className="mb-2 text-xs text-red-400" role="alert">{error}</p>}
@@ -140,7 +140,7 @@ export function MessageComposer({
           }}
           placeholder={file ? "Add a caption (optional)" : "Write a message"}
           aria-label="Message"
-          className="flex-1 resize-none rounded-xl bg-slate-800 border border-slate-700 px-3.5 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-indigo-500 max-h-36"
+          className="flex-1 resize-none rounded-xl bg-slate-800 border border-slate-700 px-3.5 py-2.5 text-sm text-slate-50 placeholder:text-slate-500 outline-none focus:border-indigo-500 max-h-36"
         />
         <Button
           type="button" size="icon-lg" aria-label="Send message" onClick={submit}

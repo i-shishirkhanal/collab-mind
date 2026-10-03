@@ -53,7 +53,7 @@ export function ReportTool({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-sm">
-        <h2 className="text-xl font-semibold text-white mb-4">Draft Report</h2>
+        <h2 className="text-xl font-semibold text-slate-50 mb-4">Draft Report</h2>
         <div className="space-y-4 max-w-xl">
           <div className="space-y-2">
             <Label className="text-slate-300">Report Title</Label>

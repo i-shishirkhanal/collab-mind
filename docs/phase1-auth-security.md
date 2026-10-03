@@ -1,6 +1,6 @@
 # Phase 1 — Authentication, authorization, schema and AI-service security
 
-Branch: `phase1/auth-security`. Canonical schema: `supabase/migrations/` (root `migration.sql` had already drifted from it and is untouched).
+Branch: `phase1/auth-security`. Canonical schema: `supabase/migrations/` (the root `migration.sql` that had drifted from it has been removed).
 
 ## 1. What changed
 

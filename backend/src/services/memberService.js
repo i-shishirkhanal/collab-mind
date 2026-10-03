@@ -29,54 +29,6 @@ const ownerCount = async (client, workspaceId) => {
 };
 
 /**
- * addMember
- * ──────────
- * Adds a user (looked up by email) to a workspace with the given role.
- * Throws a 404-status error if the email is not found in the users table.
- * Throws a 409-status error if the user is already a member.
- *
- * @param {string} workspaceId
- * @param {string} email       - Email of the user to invite
- * @param {string} role        - 'member' | 'admin' | 'owner'
- * @returns {Promise<Object>}  - The new workspace_members row
- */
-const addMember = async (workspaceId, email, role = 'member') => {
-  // 1. Resolve email → user id
-  const { rows: userRows } = await pool.query(
-    `SELECT id FROM users WHERE email = $1 AND email_verified_at IS NOT NULL LIMIT 1`,
-    [String(email).normalize('NFKC').trim().toLowerCase()],
-  );
-
-  if (userRows.length === 0) {
-    throw Object.assign(
-      new Error(`No user found with email "${email}"`),
-      { status: 404 },
-    );
-  }
-
-  const userId = userRows[0].id;
-
-  // 2. Insert membership (fails with unique-constraint if already a member)
-  try {
-    const { rows } = await pool.query(
-      `INSERT INTO workspace_members (workspace_id, user_id, role, joined_at)
-            VALUES ($1, $2, $3, NOW())
-         RETURNING *`,
-      [workspaceId, userId, role],
-    );
-    return rows[0];
-  } catch (err) {
-    if (err.code === '23505') { // unique_violation
-      throw Object.assign(
-        new Error('User is already a member of this workspace'),
-        { status: 409 },
-      );
-    }
-    throw err;
-  }
-};
-
-/**
  * updateMemberRole
  * ─────────────────
  * Changes a member's role within a workspace.
@@ -154,4 +106,4 @@ const listMembers = async (workspaceId) => {
   return rows;
 };
 
-module.exports = { addMember, removeMember, listMembers, updateMemberRole };
+module.exports = { removeMember, listMembers, updateMemberRole };

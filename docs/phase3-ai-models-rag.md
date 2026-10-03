@@ -124,7 +124,7 @@ See `ai/.env.example` (all variables, validated at startup by `ai/config.py`: ba
 the affected endpoints return 503). Nothing here is exposed to the frontend bundle. Migration for existing databases:
 `supabase/migrations/20261002020000_phase3_embeddings_rag.sql` — **destructive for chunks** (old 768-d Gemini/hash vectors cannot be converted):
 it deletes `source_chunks`, flags those sources `failed` + `needs_reindex`, resizes the column; then run `cd ai && python -m scripts.reindex`.
-`ensure_schema()` in `ai/db.py` applies the additive parts (columns, FTS index, `llm_usage`) idempotently at startup but never resizes the vector column.
+`ensure_schema()` in `ai/db.py` is a read-only check: it verifies the migrations were applied and that the vector column matches the configured dimension (it never runs DDL). A mismatch makes indexing and retrieval fail loudly.
 
 ## 7. Tests
 ```bash

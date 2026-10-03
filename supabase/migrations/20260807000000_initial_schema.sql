@@ -33,7 +33,7 @@ CREATE TABLE sources (
     type VARCHAR(50) NOT NULL,
     url TEXT,
     metadata JSONB,
-    status VARCHAR(50) DEFAULT 'processing', -- processing, ready, error
+    status VARCHAR(50) DEFAULT 'processing', -- processing, ready, failed
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

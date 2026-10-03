@@ -8,4 +8,6 @@ COPY . .
 RUN mkdir -p /app/uploads && chown node:node /app/uploads
 USER node
 EXPOSE 4000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:${PORT:-4000}/health >/dev/null || exit 1
 CMD ["node", "index.js"]

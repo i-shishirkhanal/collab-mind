@@ -85,6 +85,10 @@ services:
         sync: false
       - key: GCS_BUCKET_NAME
         sync: false
+      - key: SUPABASE_URL              # document storage (same project as the backend)
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
 
   - type: web
     name: collabmind-frontend

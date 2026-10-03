@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, Loader2 } from "lucide-react";
 
 import { useChatStore, usePresenceStore } from "@/lib/store";
-import { getChatHistory, sendChat } from "@/lib/api";
+import { CHAT_PAGE_SIZE, getChatHistory, sendChat } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import { ChatMessage } from "./ChatMessage";
 import { CitationPanel } from "./CitationPanel";
 import { useSocketContext } from "@/hooks/SocketProvider";
@@ -12,6 +13,9 @@ import { useSocketContext } from "@/hooks/SocketProvider";
 export function ChatInterface({ workspaceId }: { workspaceId: string }) {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const keepScroll = useRef(false);
   const messages = useChatStore(s => s.messages);
   const addMessage = useChatStore(s => s.addMessage);
   const replaceMessage = useChatStore(s => s.replaceMessage);
@@ -34,11 +38,36 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
     getChatHistory(workspaceId).then(data => {
       if (data.messages) {
         setMessages(data.messages);
+        setHasOlder(data.messages.length >= CHAT_PAGE_SIZE);
       }
     }).catch(console.error);
   }, [workspaceId, setMessages]);
 
+  const loadOlder = async () => {
+    const oldest = messages.find(m => !m.id.startsWith('local-'));
+    if (!oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const data = await getChatHistory(workspaceId, oldest.created_at);
+      const page: typeof messages = data.messages ?? [];
+      const known = new Set(messages.map(m => m.id));
+      const fresh = page.filter(m => !known.has(m.id));
+      keepScroll.current = true;
+      if (fresh.length > 0) setMessages([...fresh, ...messages]);
+      setHasOlder(fresh.length > 0 && page.length >= CHAT_PAGE_SIZE);
+    } catch (err) {
+      setError(errorMessage(err, "Could not load older messages."));
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
   useEffect(() => {
+    if (keepScroll.current) {
+      // Older messages were prepended: leave the viewport where it is.
+      keepScroll.current = false;
+      return;
+    }
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -118,6 +147,17 @@ export function ChatInterface({ workspaceId }: { workspaceId: string }) {
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-20">
         <div className="max-w-4xl mx-auto pb-4">
+          {hasOlder && (
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={loadOlder}
+                disabled={loadingOlder}
+                className="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-full px-4 py-1.5 disabled:opacity-50"
+              >
+                {loadingOlder ? "Loading…" : "Load older messages"}
+              </button>
+            </div>
+          )}
           {messages.map((m) => (
             <ChatMessage key={m.id} message={m} />
           ))}

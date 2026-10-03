@@ -51,7 +51,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: data.user.email,
             accessToken: data.token,
             accessTokenExpires: Date.parse(data.expiresAt) || undefined,
-          } as any
+          }
         }
         if (res.status === 403 && data.code === "EMAIL_NOT_VERIFIED") throw new EmailNotVerified()
         if (res.status === 429) throw new RateLimited()
@@ -64,8 +64,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id || token.sub
-        token.accessToken = (user as any).accessToken
-        token.accessTokenExpires = (user as any).accessTokenExpires
+        token.accessToken = user.accessToken
+        token.accessTokenExpires = user.accessTokenExpires
       }
       return token
     },
@@ -73,12 +73,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const expired =
         typeof token.accessTokenExpires === "number" && token.accessTokenExpires < Date.now()
       if (session.user) {
-        ;(session.user as any).id = token.id
+        ;session.user.id = token.id ?? ""
       }
       if (token.accessToken && !expired) {
-        ;(session as any).accessToken = token.accessToken
+        ;session.accessToken = token.accessToken
       } else {
-        ;(session as any).error = "SessionExpired"
+        ;session.error = "SessionExpired"
       }
       return session
     },
@@ -86,7 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     // Revoke the server-side session when the user signs out.
     async signOut(message) {
-      const accessToken = "token" in message ? (message.token as any)?.accessToken : undefined
+      const accessToken = "token" in message ? (message.token as { accessToken?: string } | null)?.accessToken : undefined
       if (!accessToken) return
       try {
         await fetch(`${API_URL}/api/auth/logout`, {

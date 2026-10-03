@@ -66,6 +66,20 @@ const assertParticipant = async (callId, userId, client) => {
   return rows[0];
 };
 
+/**
+ * Participation is a snapshot taken when the call starts. Anyone who has since left or been removed from the
+ * conversation must not be able to (re)join or mint a media token, so check the live membership too.
+ */
+const assertStillMember = async (callId, userId, client) => {
+  const { rows } = await (client || pool).query(
+    `SELECT 1 FROM calls c
+       JOIN conversation_members cm ON cm.conversation_id = c.conversation_id AND cm.user_id = $2
+      WHERE c.id = $1`,
+    [callId, userId],
+  );
+  if (rows.length === 0) throw httpError(404, 'Call not found');
+};
+
 const broadcastUpdate = async (callId) => {
   const dto = await snapshot(callId);
   realtime.emitToConversation(dto.conversation_id, 'call:updated', dto);
@@ -177,6 +191,7 @@ const startCall = async (conversationId, userId, kind) => {
 const joinCall = async (callId, userId) => {
   const ended = await withTransaction(async (client) => {
     await assertParticipant(callId, userId, client);
+    await assertStillMember(callId, userId, client);
     const call = await loadCall(callId, client);
     if (!LIVE.includes(call.status)) throw httpError(410, 'This call has ended');
     await client.query(
@@ -244,11 +259,22 @@ const endCall = async (callId, userId) => {
 /** Fresh LiveKit credentials for someone already in the call (e.g. after a refresh). */
 const issueToken = async (callId, userId) => {
   const p = await assertParticipant(callId, userId);
+  await assertStillMember(callId, userId);
   if (p.status !== 'joined') throw httpError(403, 'Join the call before requesting a token');
   const call = await loadCall(callId);
   if (!LIVE.includes(call.status)) throw httpError(410, 'This call has ended');
   const user = await getUser(userId);
   return livekit.issueJoinCredentials({ callId, userId, userName: user.name });
+};
+
+/** A user removed from a conversation leaves its live calls straight away (their media token is short-lived). */
+const dropUserFromLiveCalls = async (conversationId, userId) => {
+  const { rows } = await pool.query(
+    `SELECT c.id FROM calls c JOIN call_participants cp ON cp.call_id = c.id AND cp.user_id = $2
+      WHERE c.conversation_id = $1 AND c.status = ANY($3::text[]) AND cp.status = 'joined'`,
+    [conversationId, userId, LIVE],
+  );
+  await Promise.all(rows.map((r) => leaveCall(r.id, userId).catch((e) => console.warn(`[Calls] drop on removal failed: ${e.message}`))));
 };
 
 const getActiveCall = async (conversationId, userId) => {
@@ -385,5 +411,5 @@ const startSweeper = () => {
 
 module.exports = {
   RING_TIMEOUT_SECONDS, startCall, joinCall, declineCall, leaveCall, endCall, issueToken,
-  getActiveCall, listPendingForUser, listHistory, leaveAllCallsFor, sweepStaleCalls, startSweeper,
+  dropUserFromLiveCalls, getActiveCall, listPendingForUser, listHistory, leaveAllCallsFor, sweepStaleCalls, startSweeper,
 };

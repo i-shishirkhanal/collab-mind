@@ -3,7 +3,16 @@ import { getAccessToken, handleUnauthorized } from '@/lib/authToken';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-export async function apiCall(endpoint: string, options: RequestInit = {}) {
+function extractError(parsed: unknown, fallback: string): string {
+  if (typeof parsed === 'object' && parsed !== null) {
+    const body = parsed as { error?: string; detail?: string; message?: string };
+    return body.error || body.detail || body.message || fallback;
+  }
+  return typeof parsed === 'string' && parsed ? parsed : fallback;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callers read endpoint-specific fields
+export async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
   const token = await getAccessToken();
   if (!token) {
     handleUnauthorized();
@@ -22,7 +31,7 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
       ...options,
       headers,
     });
-  } catch (err: any) {
+  } catch {
     throw new Error('CONNECTION_FAILED');
   }
 
@@ -32,20 +41,17 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
   }
 
   const text = await response.text();
-  let parsed: any = null;
+  let parsed: unknown = null;
   if (text && text.trim()) {
     try {
       parsed = JSON.parse(text);
-    } catch (e) {
+    } catch {
       parsed = text;
     }
   }
 
   if (!response.ok) {
-    const errorMsg = (typeof parsed === 'object' && parsed !== null)
-      ? (parsed.error || parsed.detail || parsed.message || `API error: ${response.status} ${response.statusText}`)
-      : (typeof parsed === 'string' && parsed ? parsed : `API error: ${response.status} ${response.statusText}`);
-    throw new Error(errorMsg);
+    throw new Error(extractError(parsed, `API error: ${response.status} ${response.statusText}`));
   }
 
   return parsed ?? {};
@@ -82,7 +88,7 @@ export const uploadSourceFile = async (workspaceId: string, file: File) => {
       },
       body: formData,
     });
-  } catch (err: any) {
+  } catch {
     throw new Error('CONNECTION_FAILED');
   }
 
@@ -92,20 +98,17 @@ export const uploadSourceFile = async (workspaceId: string, file: File) => {
   }
 
   const text = await response.text();
-  let parsed: any = null;
+  let parsed: unknown = null;
   if (text && text.trim()) {
     try {
       parsed = JSON.parse(text);
-    } catch (e) {
+    } catch {
       parsed = text;
     }
   }
 
   if (!response.ok) {
-    const errorMsg = (typeof parsed === 'object' && parsed !== null)
-      ? (parsed.error || parsed.detail || parsed.message || 'Failed to upload source file')
-      : (typeof parsed === 'string' && parsed ? parsed : 'Failed to upload source file');
-    throw new Error(errorMsg);
+    throw new Error(extractError(parsed, 'Failed to upload source file'));
   }
 
   return parsed ?? {};
@@ -143,13 +146,14 @@ export const removeMember = (workspaceId: string, userId: string) =>
   apiCall(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' });
 
 // Chat API
-export const sendChatMessage = (workspaceId: string, message: string, conversation_history: any[] = []) => 
+export const CHAT_PAGE_SIZE = 50;
+export const sendChatMessage = (workspaceId: string, message: string, conversation_history: unknown[] = []) => 
   apiCall(`/api/workspaces/${workspaceId}/chat`, { method: 'POST', body: JSON.stringify({ message, conversation_history }) });
 
 export const sendChat = sendChatMessage;
 
-export const getChatHistory = (workspaceId: string) => 
-  apiCall(`/api/workspaces/${workspaceId}/chat/history`);
+export const getChatHistory = (workspaceId: string, before?: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/chat/history?limit=${CHAT_PAGE_SIZE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
 
 // Agent/Studio API
 export const triggerStudyCoach = (workspaceId: string, goal: string) => 
@@ -167,3 +171,29 @@ export const generateStudyGuide = (workspaceId: string, topic: string) =>
   apiCall(`/api/workspaces/${workspaceId}/studio/guide`, { method: 'POST', body: JSON.stringify({ topic }) });
 export const generateReport = (workspaceId: string, title: string, outlinePoints: string[]) => 
   apiCall(`/api/workspaces/${workspaceId}/studio/report`, { method: 'POST', body: JSON.stringify({ title, outline_points: outlinePoints }) });
+
+// Account API
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  apiCall('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+export const logoutEverywhere = () => apiCall('/api/auth/logout-all', { method: 'POST' });
+export const deleteAccount = (password: string) =>
+  apiCall('/api/auth/account', { method: 'DELETE', body: JSON.stringify({ password }) });
+
+// Invitations
+export interface WorkspaceInvite {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  role: string;
+  created_at: string;
+  invited_by_name: string | null;
+}
+export interface PendingInvite { id: string; role: string; created_at: string; invited_name: string }
+
+export const getMyInvites = (): Promise<WorkspaceInvite[]> => apiCall('/api/invites');
+export const acceptInvite = (inviteId: string) => apiCall(`/api/invites/${inviteId}/accept`, { method: 'POST' });
+export const declineInvite = (inviteId: string) => apiCall(`/api/invites/${inviteId}/decline`, { method: 'POST' });
+export const getWorkspaceInvites = (workspaceId: string): Promise<PendingInvite[]> =>
+  apiCall(`/api/workspaces/${workspaceId}/invites`);
+export const cancelInvite = (workspaceId: string, inviteId: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/invites/${inviteId}`, { method: 'DELETE' });

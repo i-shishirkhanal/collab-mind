@@ -61,7 +61,7 @@ async def _get_context(pool: asyncpg.Pool, workspace_id: str, topic: Optional[st
     for i, c in enumerate(chunks, start=1):
         where = f" | {c['location_label']}" if c.get("location_label") else ""
         parts.append(f"[{i}] Source: {c['source_name']}{where}\n{c['content']}")
-    return "=== WORKSPACE CONTEXT ===\n" + "\n\n".join(parts), chunks
+    return grounding.fence("WORKSPACE CONTEXT", "\n\n".join(parts)), chunks
 
 
 def _parse_json(text: str) -> dict:
@@ -88,13 +88,14 @@ def _parse_json(text: str) -> dict:
     return data
 
 
-async def _generate_json(pool, workspace_id: str, kind: str, task: Task, system: str, user: str, model_cls):
+async def _generate_json(pool, workspace_id: str, kind: str, task: Task, system: str, user: str, model_cls,
+                         user_id: Optional[str] = None):
     completion: Completion = await get_router().complete(
         task,
-        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        [{"role": "system", "content": f"{system} {grounding.UNTRUSTED_RULE}"}, {"role": "user", "content": user}],
         json_mode=True, temperature=0.3,
     )
-    await record_usage(pool, workspace_id=workspace_id, user_id=None, kind=kind, task=task.value,
+    await record_usage(pool, workspace_id=workspace_id, user_id=user_id, kind=kind, task=task.value,
                        route=completion.route, usage=completion.usage)
     try:
         return model_cls(**_parse_json(completion.text))
@@ -144,11 +145,11 @@ async def summarize_source(pool: asyncpg.Pool, request: SummarizeRequest) -> Sum
               f"facts. {_JSON_NOTE}")
     user = (
         f"Document: '{source_name}'" + (" (truncated to its first part)" if truncated else "") +
-        f"\n\n{full_text[:SUMMARY_MAX_CHARS]}\n\n"
+        f"\n\n{grounding.fence('DOCUMENT', full_text[:SUMMARY_MAX_CHARS])}\n\n"
         'JSON schema: {"summary": "string", "key_takeaways": ["string"]}'
     )
     data = await _generate_json(pool, request.workspace_id, "summarize", Task.STUDY, system, user,
-                                _SummaryShape)
+                                _SummaryShape, user_id=request.user_id)
     return SummarizeResponse(
         source_id=request.source_id, source_name=source_name, summary=data.summary,
         key_takeaways=data.key_takeaways, word_count=len(full_text.split()),
@@ -164,7 +165,7 @@ async def generate_flashcards(pool: asyncpg.Pool, request: FlashcardRequest) -> 
         'JSON schema: {"flashcards": [{"front": "string", "back": "string", "source_ref": "source name"}]}'
     )
     result = await _generate_json(pool, request.workspace_id, "flashcards", Task.STUDY, system, user,
-                                  FlashcardsResponse)
+                                  FlashcardsResponse, user_id=request.user_id)
     for card in result.flashcards:
         card.source_ref = _resolve_ref(card.source_ref, chunks)
     result.flashcards = result.flashcards[: request.count]
@@ -176,13 +177,14 @@ async def generate_quiz(pool: asyncpg.Pool, request: QuizRequest) -> QuizRespons
     system = ("You are a test-prep instructor. Base every question and answer strictly on the "
               f"workspace context. source_ref must be the exact source name. {_JSON_NOTE}")
     user = (
-        f"Write up to {request.count} multiple-choice questions on '{request.topic}' at "
+        f"Write up to {request.count} multiple-choice questions on {json.dumps(request.topic)} at "
         f"{request.difficulty} difficulty. `correct` must equal one of the `options` verbatim.\n\n"
         f"{context}\n\n"
         'JSON schema: {"questions": [{"question": "string", "options": ["string"], '
         '"correct": "string", "explanation": "string", "source_ref": "source name"}]}'
     )
-    result = await _generate_json(pool, request.workspace_id, "quiz", Task.STUDY, system, user, QuizResponse)
+    result = await _generate_json(pool, request.workspace_id, "quiz", Task.STUDY, system, user, QuizResponse,
+                                  user_id=request.user_id)
     valid = []
     for q in result.questions:
         if q.correct not in q.options:  # drop malformed items rather than ship a broken answer key
@@ -199,12 +201,12 @@ async def generate_study_guide(pool: asyncpg.Pool, request: StudyGuideRequest) -
     context, _ = await _get_context(pool, request.workspace_id, request.topic, top_k=30)
     system = f"You are a textbook author. Use only information in the workspace context. {_JSON_NOTE}"
     user = (
-        f"Create a structured study guide for '{request.topic}'.\n\n{context}\n\n"
+        f"Create a structured study guide for {json.dumps(request.topic)}.\n\n{context}\n\n"
         'JSON schema: {"title": "string", "sections": [{"heading": "string", "content": "string", '
         '"key_terms": ["string"]}]}'
     )
     return await _generate_json(pool, request.workspace_id, "study_guide", Task.STUDY, system, user,
-                                StudyGuideResponse)
+                                StudyGuideResponse, user_id=request.user_id)
 
 
 async def generate_report(pool: asyncpg.Pool, request: ReportRequest) -> ReportResponse:
@@ -213,7 +215,8 @@ async def generate_report(pool: asyncpg.Pool, request: ReportRequest) -> ReportR
     system = (
         "You are a research analyst writing a markdown report. Follow the outline exactly. Use ONLY the "
         "numbered workspace context; cite with [n] after each supported statement and never cite a number "
-        "that does not exist. Where the sources do not cover an outline point, say so instead of filling in."
+        "that does not exist. Where the sources do not cover an outline point, say so instead of filling in. "
+        + grounding.UNTRUSTED_RULE
     )
     user = f"Title: {request.title}\nOutline: {json.dumps(request.outline_points)}\n\n{context}"
     completion = await get_router().complete(
@@ -221,7 +224,7 @@ async def generate_report(pool: asyncpg.Pool, request: ReportRequest) -> ReportR
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
         temperature=0.3,
     )
-    await record_usage(pool, workspace_id=request.workspace_id, user_id=None, kind="report",
+    await record_usage(pool, workspace_id=request.workspace_id, user_id=request.user_id, kind="report",
                        task=Task.RESEARCH.value, route=completion.route, usage=completion.usage)
     resolved = grounding.resolve_citations(completion.text, chunks)
     lines = [resolved.answer.rstrip(), "", "## Sources", ""]

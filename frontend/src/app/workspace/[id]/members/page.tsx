@@ -1,12 +1,14 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useWorkspaceStore, usePresenceStore } from "@/lib/store";
-import { inviteMember, updateMemberRole, removeMember, getWorkspaceMembers } from "@/lib/api";
+import { inviteMember, updateMemberRole, removeMember, getWorkspaceInvites, cancelInvite, type PendingInvite } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { errorMessage } from "@/lib/errors";
+import type { WorkspaceMember } from "@/types";
 import { Loader2, UserPlus, X, Check, AlertCircle } from "lucide-react";
 
 const ROLES = ["member", "admin", "owner"] as const;
@@ -26,9 +28,29 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
-  const currentUserId = (session as any)?.user?.id;
+  const currentUserId = session?.user?.id;
   const self = members.find(m => m.user_id === currentUserId);
   const isOwner = self?.role === "owner";
+  const [pending, setPending] = useState<PendingInvite[]>([]);
+
+  const loadPending = useCallback(() => {
+    if (!isOwner) return;
+    getWorkspaceInvites(id).then(setPending).catch(() => setPending([]));
+  }, [id, isOwner]);
+
+  useEffect(() => {
+    loadPending();
+  }, [loadPending]);
+
+  const handleCancelInvite = async (inviteId: string) => {
+    setRowError(null);
+    try {
+      await cancelInvite(id, inviteId);
+      setPending(list => list.filter(i => i.id !== inviteId));
+    } catch (err) {
+      setRowError(errorMessage(err, "Failed to cancel the invitation"));
+    }
+  };
 
   const handleInvite = async () => {
     if (!email.trim()) return;
@@ -37,15 +59,13 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
     setInviteSuccess(null);
     try {
       await inviteMember(id, email.trim(), inviteRole);
-      // The invite endpoint only returns the raw membership row (no
-      // name/email), so refetch the fully-hydrated list instead of
-      // splicing a partial object into state.
-      const refreshed = await getWorkspaceMembers(id);
-      setMembers(Array.isArray(refreshed) ? refreshed : (refreshed?.members ?? []));
-      setInviteSuccess(`${email.trim()} added to the workspace.`);
+      // The answer is deliberately the same for every address: nothing here confirms whether an
+      // account exists. The person joins only after accepting.
+      setInviteSuccess("If that address belongs to a CollabMind account, an invitation has been sent.");
       setEmail("");
-    } catch (err: any) {
-      setInviteError(err.message || "Failed to invite member");
+      loadPending();
+    } catch (err) {
+      setInviteError(errorMessage(err, "Failed to invite member"));
     } finally {
       setInviting(false);
     }
@@ -56,9 +76,9 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
     setRowError(null);
     try {
       await updateMemberRole(id, userId, role);
-      setMembers(members.map(m => (m.user_id === userId ? { ...m, role: role as any } : m)));
-    } catch (err: any) {
-      setRowError(err.message || "Failed to update role");
+      setMembers(members.map(m => (m.user_id === userId ? { ...m, role: role as WorkspaceMember["role"] } : m)));
+    } catch (err) {
+      setRowError(errorMessage(err, "Failed to update role"));
     } finally {
       setBusyUserId(null);
     }
@@ -70,8 +90,8 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
     try {
       await removeMember(id, userId);
       setMembers(members.filter(m => m.user_id !== userId));
-    } catch (err: any) {
-      setRowError(err.message || "Failed to remove member");
+    } catch (err) {
+      setRowError(errorMessage(err, "Failed to remove member"));
     } finally {
       setBusyUserId(null);
     }
@@ -83,7 +103,7 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-serif font-semibold text-white tracking-tight">Team members</h1>
+            <h1 className="text-2xl font-serif font-semibold text-slate-50 tracking-tight">Team members</h1>
             <p className="text-sm text-slate-400 mt-1">Manage access to this collaborative workspace.</p>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -101,7 +121,7 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-                className="bg-slate-800 border-slate-700 text-white flex-1"
+                className="bg-slate-800 border-slate-700 text-slate-50 flex-1"
                 disabled={inviting}
               />
               <select
@@ -127,12 +147,26 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
             {inviteSuccess && (
               <p className="text-xs text-green-400 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{inviteSuccess}</p>
             )}
-            <p className="text-xs text-slate-500">The invited person must already have a CollabMind account with this email.</p>
+            <p className="text-xs text-slate-500">The person must have a CollabMind account with this email and accept the invitation before they join.</p>
           </div>
         )}
 
         {rowError && (
           <p className="text-xs text-red-400 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />{rowError}</p>
+        )}
+
+        {isOwner && pending.length > 0 && (
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-2">
+            <h3 className="text-sm font-semibold text-slate-200">Pending invitations</h3>
+            <ul className="space-y-1">
+              {pending.map(inv => (
+                <li key={inv.id} className="flex items-center justify-between text-sm text-slate-300">
+                  <span className="truncate">{inv.invited_name} <span className="text-slate-500 capitalize">· {inv.role}</span></span>
+                  <button onClick={() => handleCancelInvite(inv.id)} title="Cancel invitation" className="w-7 h-7 rounded-md flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10"><X className="w-3.5 h-3.5" /></button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
@@ -159,7 +193,7 @@ export default function MembersPage({ params }: { params: Promise<{ id: string }
                       <h4 className="font-semibold text-slate-200 truncate">
                         {member.name}{isSelf && <span className="text-slate-500 font-normal"> (you)</span>}
                       </h4>
-                      <p className="text-xs text-slate-400 truncate">{member.email}</p>
+                      <p className="text-xs text-slate-400 truncate">{member.email ?? member.role}</p>
                     </div>
                   </div>
 

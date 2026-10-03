@@ -2,8 +2,13 @@
 binary fixtures."""
 
 import io
+import os
 
 import pytest
+
+# Unit tests patch module globals (UPLOADS_DIR, ...) that a spawned child would not see.
+# The sandbox itself is covered by tests/test_sandbox.py.
+os.environ.setdefault("EXTRACTION_ISOLATION", "thread")
 
 
 @pytest.fixture

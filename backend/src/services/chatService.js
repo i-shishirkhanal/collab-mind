@@ -24,10 +24,12 @@ const getChatMessages = async (workspaceId, limit = 50, before = null) => {
   `;
   const params = [workspaceId];
 
-  // Cursor-based pagination: fetch messages before a given timestamp
+  // Cursor-based pagination. The cursor is a JS Date (millisecond precision) while created_at has
+  // microseconds, so compare at millisecond precision and include ties (the client merges by id)
+  // rather than skipping rows that share the cursor's millisecond.
   if (before) {
     params.push(before);
-    query += ` AND cm.created_at < $${params.length}`;
+    query += ` AND date_trunc('milliseconds', cm.created_at) <= $${params.length}::timestamptz`;
   }
 
   // Take the NEWEST `limit` rows (older than the cursor, if any), then return them oldest-first.

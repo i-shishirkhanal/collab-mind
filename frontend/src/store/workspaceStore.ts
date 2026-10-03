@@ -1,10 +1,11 @@
 import { create } from 'zustand';
+import type { Workspace } from '@/types';
 
 interface WorkspaceState {
-  workspaces: any[];
-  activeWorkspace: any | null;
-  setWorkspaces: (workspaces: any[]) => void;
-  setActiveWorkspace: (workspace: any) => void;
+  workspaces: Workspace[];
+  activeWorkspace: Workspace | null;
+  setWorkspaces: (workspaces: Workspace[]) => void;
+  setActiveWorkspace: (workspace: Workspace) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({

@@ -7,9 +7,10 @@ import { useWorkspaceStore } from '@/lib/store';
 // Backend list endpoints return a plain array; some wrap it as { members: [...] }
 // or { sources: [...] }. Accept either so a response-shape change on one side
 // doesn't silently empty the UI on the other.
-function asList<T>(value: any, key: string): T[] {
+function asList<T>(value: unknown, key: string): T[] {
   if (Array.isArray(value)) return value;
-  if (value && Array.isArray(value[key])) return value[key];
+  const inner = (value as Record<string, unknown> | null)?.[key];
+  if (Array.isArray(inner)) return inner as T[];
   return [];
 }
 

@@ -29,7 +29,7 @@ export function ConversationList() {
     <div className="flex flex-col h-full min-h-0">
       <div className="h-16 px-4 flex items-center justify-between border-b border-slate-800/60 shrink-0">
         <div>
-          <h1 className="text-lg font-semibold text-white leading-tight">Messages</h1>
+          <h1 className="text-lg font-semibold text-slate-50 leading-tight">Messages</h1>
           <p className="text-[11px] leading-none text-slate-500">{connected ? "Live" : "Connecting…"}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -49,7 +49,7 @@ export function ConversationList() {
           <Input
             value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search conversations"
             aria-label="Search conversations"
-            className="pl-8 h-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+            className="pl-8 h-9 bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
           />
         </div>
       </div>
@@ -82,7 +82,7 @@ export function ConversationList() {
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className={cn("truncate text-sm", unread > 0 ? "font-semibold text-white" : "font-medium text-slate-200")}>{d.title}</span>
+                  <span className={cn("truncate text-sm", unread > 0 ? "font-semibold text-slate-50" : "font-medium text-slate-200")}>{d.title}</span>
                   <span className="text-[11px] text-slate-500 shrink-0">{formatShortTime(c.last_message_at)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">

@@ -1,6 +1,6 @@
 const authService = require('../services/authService');
 const { revokeSession } = require('../services/sessionService');
-const { disconnectSession } = require('../services/realtime');
+const { disconnectSession, disconnectUser } = require('../services/realtime');
 
 const GENERIC_REGISTER = 'If this email can be registered, a verification link has been sent.';
 const GENERIC_RESEND = 'If an unverified account exists for this email, a new verification link has been sent.';
@@ -51,4 +51,23 @@ const resetPassword = asyncRoute(async (req, res) => {
   res.json({ message: 'Password updated. Please sign in with your new password.' });
 });
 
-module.exports = { register, verifyEmail, resendVerification, login, logout, me, forgotPassword, resetPassword };
+const changePassword = asyncRoute(async (req, res) => {
+  const { currentPassword, newPassword } = body(req);
+  const revoked = await authService.changePassword(req.user.id, req.user.sessionId, currentPassword, newPassword);
+  revoked.forEach(disconnectSession);
+  res.json({ message: 'Password changed. Your other sessions have been signed out.' });
+});
+
+const logoutAll = asyncRoute(async (req, res) => {
+  await authService.signOutEverywhere(req.user.id);
+  disconnectUser(req.user.id);
+  res.status(204).end();
+});
+
+const deleteAccount = asyncRoute(async (req, res) => {
+  await authService.deleteAccount(req.user.id, body(req).password);
+  disconnectUser(req.user.id);
+  res.status(204).end();
+});
+
+module.exports = { changePassword, logoutAll, deleteAccount, register, verifyEmail, resendVerification, login, logout, me, forgotPassword, resetPassword };

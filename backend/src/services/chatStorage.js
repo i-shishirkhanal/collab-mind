@@ -62,4 +62,24 @@ const createSignedUrl = async (objectPath, downloadName) => {
   return downloadName ? `${full}&download=${encodeURIComponent(downloadName)}` : full;
 };
 
-module.exports = { isConfigured, upload, createSignedUrl, BUCKET };
+/**
+ * Best-effort removal of stored attachments (message deleted, conversation deleted). Never throws:
+ * a leftover object is a storage-cost problem, not a reason to fail the user's request.
+ */
+const removeObjects = async (objectPaths) => {
+  const prefixes = (objectPaths || []).filter(Boolean);
+  if (prefixes.length === 0 || !isConfigured()) return;
+  const { url, key } = cfg();
+  try {
+    const res = await fetch(`${url}/storage/v1/object/${BUCKET}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes }),
+    });
+    if (!res.ok) console.warn(`[ChatStorage] delete of ${prefixes.length} object(s) failed: ${res.status}`);
+  } catch (err) {
+    console.warn(`[ChatStorage] delete failed: ${err.message}`);
+  }
+};
+
+module.exports = { isConfigured, upload, createSignedUrl, removeObjects, BUCKET };

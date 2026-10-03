@@ -14,7 +14,7 @@ export function AgentTool({ workspaceId }: { workspaceId: string }) {
   const [runId, setRunId] = useState<string | null>(null);
   
   const [status, setStatus] = useState<AgentStatus | null>(null);
-  const [plan, setPlan] = useState<any>(null);
+  const [plan, setPlan] = useState<unknown>(null);
 
   const startAgent = async () => {
     if (!goal) return;
@@ -90,7 +90,7 @@ export function AgentTool({ workspaceId }: { workspaceId: string }) {
             <Zap className="w-5 h-5 text-purple-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Study Coach Agent</h2>
+            <h2 className="text-xl font-semibold text-slate-50">Study Coach Agent</h2>
             <p className="text-xs text-slate-500">Autonomous multi-step learning planner</p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export function AgentTool({ workspaceId }: { workspaceId: string }) {
                     </h4>
 
                     {/* Show execution Plan JSON if available at planning/approval phase */}
-                    {step.id === "planning" && plan && (state === "done" || state === "active") && (
+                    {step.id === "planning" && plan != null && (state === "done" || state === "active") && (
                        <pre className="mt-3 bg-slate-950 p-3 rounded text-xs text-slate-400 overflow-x-auto border border-slate-800">
                          {JSON.stringify(plan, null, 2)}
                        </pre>

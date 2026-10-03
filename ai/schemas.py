@@ -27,6 +27,7 @@ class EmbedResponse(BaseModel):
 
 class SummarizeRequest(BaseModel):
     workspace_id: Id
+    user_id: Optional[Id] = None  # usage accounting only; set by the backend
     source_id: Id
 
 
@@ -121,6 +122,7 @@ class AgentStatusResponse(BaseModel):
 
 class FlashcardRequest(BaseModel):
     workspace_id: Id
+    user_id: Optional[Id] = None  # usage accounting only; set by the backend
     topic: Optional[Annotated[str, Field(max_length=500)]] = None
     count: Annotated[int, Field(ge=1, le=50)] = 20
 
@@ -135,6 +137,7 @@ class FlashcardsResponse(BaseModel):
 
 class QuizRequest(BaseModel):
     workspace_id: Id
+    user_id: Optional[Id] = None  # usage accounting only; set by the backend
     topic: ShortText
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     count: Annotated[int, Field(ge=1, le=30)] = 10
@@ -152,6 +155,7 @@ class QuizResponse(BaseModel):
 
 class StudyGuideRequest(BaseModel):
     workspace_id: Id
+    user_id: Optional[Id] = None  # usage accounting only; set by the backend
     topic: ShortText
 
 class StudyGuideSection(BaseModel):
@@ -166,6 +170,7 @@ class StudyGuideResponse(BaseModel):
 
 class ReportRequest(BaseModel):
     workspace_id: Id
+    user_id: Optional[Id] = None  # usage accounting only; set by the backend
     title: ShortText
     outline_points: Annotated[list[ShortText], Field(max_length=30)]
 

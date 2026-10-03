@@ -29,6 +29,16 @@ cd frontend && npm test
 cd ai && pip install -r requirements.txt -r requirements-dev.txt && pytest
 ```
 
+## Account and workspace model
+
+- Workspace owners **invite** people by email; the invitee accepts or declines from the dashboard
+  (`/api/invites`). Nothing reveals whether an address is registered. Members see each other's names;
+  email addresses are shown to owners and admins only.
+- `/settings`: change password, sign out of all devices, delete account (blocked while you own a workspace
+  that still has other members).
+- Document parsing runs in a sandboxed child process (see `ai/.env.example`, `EXTRACTION_*`).
+- CI (`.github/workflows/ci.yml`) runs every suite against Postgres+pgvector and Redis.
+
 ## Deploying
 
 `render.yaml` describes the three services. `docs/phase4-deployment-checklist.md` lists the

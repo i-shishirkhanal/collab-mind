@@ -1,7 +1,7 @@
 const express = require('express');
 const ctrl = require('../controllers/authController');
 const authenticate = require('../middleware/authenticate');
-const { rateLimit, emailKey } = require('../middleware/rateLimit');
+const { rateLimit, perUser, emailKey } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -23,6 +23,11 @@ router.post('/resend-verification', mailIp, mailAccount, ctrl.resendVerification
 router.post('/forgot-password',     mailIp, mailAccount, ctrl.forgotPassword);
 router.post('/reset-password',      tokenIp, ctrl.resetPassword);
 router.post('/logout',              authenticate, ctrl.logout);
+// Sensitive account operations: authenticated, re-verify the password, tightly rate limited per user.
+const accountOps = perUser('account-ops', 'ACCOUNT_OPS_LIMIT_PER_15MIN', 10, WINDOW_15M);
+router.post('/change-password',     authenticate, accountOps, ctrl.changePassword);
+router.post('/logout-all',          authenticate, accountOps, ctrl.logoutAll);
+router.delete('/account',           authenticate, accountOps, ctrl.deleteAccount);
 router.get('/me',                   authenticate, ctrl.me);
 
 module.exports = router;
