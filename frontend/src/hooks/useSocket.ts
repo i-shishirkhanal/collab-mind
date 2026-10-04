@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useSession } from 'next-auth/react';
 import { usePresenceStore, useChatStore } from '@/lib/store';
@@ -9,6 +9,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000";
 
 export const useSocket = (workspaceId?: string) => {
   const socketRef = useRef<Socket | null>(null);
+  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
   const { data: session } = useSession();
   
   const setOnline = usePresenceStore(s => s.setOnline);
@@ -34,6 +35,7 @@ export const useSocket = (workspaceId?: string) => {
       timeout: 5000,
     });
     socketRef.current = socket;
+    setSocketInstance(socket);
 
     socket.on('connect', () => {
       console.log('Socket connected, requesting room join for workspace:', workspaceId);
@@ -82,6 +84,7 @@ export const useSocket = (workspaceId?: string) => {
       timeouts.forEach((t) => clearTimeout(t));
       timeouts.clear();
       socket.disconnect();
+      setSocketInstance(null);
     };
   }, [workspaceId, session, setOnline, setOffline, setTyping, clearTyping, addMessage]);
 
@@ -93,5 +96,5 @@ export const useSocket = (workspaceId?: string) => {
     socketRef.current?.emit('presence:typing', { isTyping });
   };
 
-  return { sendMessage, sendTyping };
+  return { sendMessage, sendTyping, socket: socketInstance };
 };

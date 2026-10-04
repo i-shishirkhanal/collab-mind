@@ -25,6 +25,8 @@ const PERMISSIONS = {
   'chat:write':       'member',
   'agents:run':       'member',
   'studio:generate':  'member',
+  'whiteboard:read':  'member',
+  'whiteboard:write': 'member',
 };
 
 const roleAtLeast = (role, required) => {
