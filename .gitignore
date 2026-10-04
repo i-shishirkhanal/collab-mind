@@ -59,3 +59,4 @@ ai/ml/data/cache/
 ai/ml/data/out/
 ai/models/
 ai/ml/models/
+ai/ml/data/indomain/

@@ -50,3 +50,38 @@ this when installing).
 
 Versions are pinned; re-run the license read-out above after any upgrade of
 `markitdown` or its extras, since transitive dependencies can change license.
+
+# Machine-learning components (`ml/`, `rag/reranker.py`, `rag/verifier.py`)
+
+These are used and fine-tuned by us; the pretrained weights and public datasets below are the work of their
+authors and are credited here and in the project report. Licenses were read from each Hugging Face
+model/dataset card on 2026-10-05. **Re-check before submission; trained weights inherit the base model's licence.**
+
+## Pretrained models (starting points we fine-tune or compare against)
+
+| Model | Used for | Licence (from card) |
+|---|---|---|
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` (Reimers et al., UKP Lab) | Base for our fine-tuned reranker; off-the-shelf baseline | Apache-2.0 |
+| `microsoft/deberta-v3-small` (He et al., Microsoft) | Base for our fine-tuned claim verifier | MIT |
+| `cross-encoder/nli-deberta-v3-small` (UKP Lab) | Zero-shot NLI baseline for the verifier (not fine-tuned by us) | Apache-2.0 |
+| `BAAI/bge-small-en-v1.5` (BAAI) | Dense first-stage baseline in the retrieval ablation | MIT |
+
+## Datasets
+
+| Dataset | Used for | Licence (from card) / note |
+|---|---|---|
+| BEIR `SciFact` (Thakur et al., 2021; Wadden et al., 2020) | Reranker training queries (train qrels) and the held-out retrieval test (test qrels) | Card: CC BY-SA 4.0. The upstream SciFact release is CC BY-NC; treated as non-commercial research use |
+| `RAGTruth` via `wandb/RAGTruth-processed` (Niu et al., 2024) | Verifier training and held-out test (answer sentences with human hallucination spans) | The dataset card states no licence; research use only. Check the upstream repository before redistributing |
+| `MultiNLI` (Williams et al., 2018) | Optional entailment signal mixed into verifier training | Mixed per genre: CC BY 3.0, CC BY-SA 3.0, MIT, other |
+| English Wikipedia articles | Small in-domain study-material test kit (`ml/data/make_indomain.py`; not committed) | CC BY-SA 4.0 — attribution to the article authors required |
+
+## Libraries
+
+PyTorch (BSD-3-Clause), Hugging Face `transformers` and `sentence-transformers` (Apache-2.0), `pyarrow`
+(Apache-2.0), `httpx` (BSD-3-Clause). Consumed as pip dependencies (`requirements-ml.txt`); no source copied.
+
+## What is our own work
+
+The training loop (`ml/cross_encoder_train.py`), data builders, BM25 and metrics code, evaluation harness,
+claim splitter, premise selection, service integration (`rag/reranker.py`, `rag/verifier.py`) and every
+number in the results tables. Fine-tuned weights are derived works of the base models above.

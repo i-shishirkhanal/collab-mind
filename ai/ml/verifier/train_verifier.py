@@ -55,11 +55,19 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=2e-5)
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--dev-size", type=int, default=3000, help="dev rows used for the per-epoch check")
+    ap.add_argument("--supported-per-unsupported", type=float, default=0.0,
+                    help="if > 0, keep all unsupported claims and this many supported ones per unsupported (smaller, faster run)")
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--no-fp16", action="store_true")
     args = ap.parse_args()
 
     train, dev = read_jsonl(args.train), read_jsonl(args.dev)
+    if args.supported_per_unsupported:        # keep every unsupported claim, subsample the supported ones (CPU runs)
+        unsup = [r for r in train if r["label"] == 0]
+        sup = [r for r in train if r["label"] == 1]
+        random.Random(args.seed).shuffle(sup)
+        train = unsup + sup[: int(len(unsup) * args.supported_per_unsupported)]
+        print(f"subsampled training set: {len(unsup)} unsupported + {len(train) - len(unsup)} supported", flush=True)
     random.Random(args.seed).shuffle(dev)
     dev = dev[: args.dev_size]
     train_cross_encoder(

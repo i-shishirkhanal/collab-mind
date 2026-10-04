@@ -46,6 +46,7 @@ def chat(prompt: str, *, system: str = "", max_tokens: int = 400, temperature: f
     """One completion. Cached by (model, system, prompt, max_tokens, temperature)."""
     global _live_calls
     body = {"model": MODEL, "max_tokens": max_tokens, "temperature": temperature,
+            "reasoning": {"enabled": False},       # hidden reasoning would eat the small token budgets below
             "messages": ([{"role": "system", "content": system}] if system else [])
                         + [{"role": "user", "content": prompt}]}
     cache_file = CACHE / (hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest() + ".txt")
