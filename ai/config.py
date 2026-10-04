@@ -109,6 +109,19 @@ class RetrievalSettings:
     hybrid: bool
     rrf_k: int
     context_max_chars: int
+    # Optional cross-encoder rerank of the retrieved candidates (rag/reranker.py). Off by default.
+    reranker_enabled: bool = False
+    reranker_model: str = ""          # local path or Hugging Face id of the fine-tuned cross-encoder
+    reranker_candidates: int = 30     # how many retrieved chunks are scored before cutting to top_k
+
+
+@dataclass(frozen=True)
+class VerifierSettings:
+    """Optional claim-level faithfulness check of answers (rag/verifier.py). Off by default."""
+    enabled: bool = False
+    model: str = ""             # local path or Hugging Face id of the fine-tuned verifier
+    threshold: float = 0.5      # P(supported) below this flags a claim; tune on the dev set
+    max_claims: int = 12        # claims scored per answer (bounds CPU latency)
 
 
 @dataclass(frozen=True)
@@ -116,6 +129,7 @@ class Settings:
     llm: LLMSettings
     embedding: EmbeddingSettings
     retrieval: RetrievalSettings
+    verifier: VerifierSettings = VerifierSettings()
 
     def validate_for_serving(self) -> list[str]:
         """Return non-fatal problems (missing credentials). The service still
@@ -166,11 +180,25 @@ def load_settings() -> Settings:
         hybrid=_bool("RETRIEVAL_HYBRID", True),
         rrf_k=_int("RETRIEVAL_RRF_K", 60, min_value=1, max_value=1000),
         context_max_chars=_int("RAG_CONTEXT_MAX_CHARS", 24_000, min_value=1000, max_value=2_000_000),
+        reranker_enabled=_bool("RERANKER_ENABLED", False),
+        reranker_model=_str("RERANKER_MODEL"),
+        reranker_candidates=_int("RERANKER_CANDIDATES", 30, min_value=1, max_value=200),
     )
+    if retrieval.reranker_enabled and not retrieval.reranker_model:
+        raise ConfigError("RERANKER_ENABLED is true but RERANKER_MODEL is not set")
     if retrieval.fts_rescue_min_similarity > retrieval.min_similarity:
         raise ConfigError("RETRIEVAL_FTS_RESCUE_MIN_SIMILARITY must be <= RETRIEVAL_MIN_SIMILARITY")
 
-    return Settings(llm=llm, embedding=embedding, retrieval=retrieval)
+    verifier = VerifierSettings(
+        enabled=_bool("VERIFIER_ENABLED", False),
+        model=_str("VERIFIER_MODEL"),
+        threshold=_float("VERIFIER_THRESHOLD", 0.5, min_value=0, max_value=1),
+        max_claims=_int("VERIFIER_MAX_CLAIMS", 12, min_value=1, max_value=50),
+    )
+    if verifier.enabled and not verifier.model:
+        raise ConfigError("VERIFIER_ENABLED is true but VERIFIER_MODEL is not set")
+
+    return Settings(llm=llm, embedding=embedding, retrieval=retrieval, verifier=verifier)
 
 
 @lru_cache(maxsize=1)

@@ -1,0 +1,4 @@
+# Optional: only for the neural reranker (rag/reranker.py) and training (ml/train_reranker.py).
+# Not installed in the service image by default; the service runs without it.
+sentence-transformers>=3.0
+torch>=2.2
