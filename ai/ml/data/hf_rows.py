@@ -41,6 +41,40 @@ def _page(dataset: str, config: str, split: str, offset: int, length: int) -> di
     raise RuntimeError(f"{dataset}/{config}/{split} @ {offset}: gave up after retries")
 
 
+def iter_parquet(dataset: str, config: str, split: str, *, columns: Optional[list[str]] = None,
+                 every: int = 1) -> Iterator[dict]:
+    """Rows of a whole split from its auto-converted Parquet files (one download per file, no rate limit).
+
+    Needs `pyarrow` (preinstalled on Kaggle/Colab). `every=k` keeps every k-th row for cheap subsampling."""
+    import pyarrow.parquet as pq
+
+    CACHE.mkdir(parents=True, exist_ok=True)
+    urls = httpx.get(f"https://huggingface.co/api/datasets/{dataset}/parquet/{config}/{split}", timeout=60,
+                     follow_redirects=True).raise_for_status().json()
+    n = 0
+    for i, url in enumerate(urls):
+        path = CACHE / f"{dataset.replace('/', '__')}__{config}__{split}__{i}.parquet"
+        if not path.exists():
+            tmp = path.with_suffix(".part")
+            for attempt in range(4):
+                try:
+                    with httpx.stream("GET", url, timeout=300, follow_redirects=True) as r, open(tmp, "wb") as f:
+                        r.raise_for_status()
+                        for chunk in r.iter_bytes(1 << 20):
+                            f.write(chunk)
+                    break
+                except httpx.TransportError:
+                    if attempt == 3:
+                        raise
+                    time.sleep(5 * (attempt + 1))
+            tmp.replace(path)
+        for batch in pq.ParquetFile(path).iter_batches(batch_size=2048, columns=columns):
+            for row in batch.to_pylist():
+                if n % every == 0:
+                    yield row
+                n += 1
+
+
 def iter_rows(dataset: str, config: str, split: str, *, limit: Optional[int] = None,
               start: int = 0) -> Iterator[dict]:
     """Rows in order from `start`, at most `limit` of them."""

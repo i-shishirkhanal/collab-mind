@@ -23,7 +23,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from ml.data.hf_rows import PAGE, iter_rows
+from ml.data.hf_rows import iter_parquet
 from ml.verifier.sentences import MIN_CLAIM_CHARS, select_premise, sentence_spans, strip_citations
 
 OUT = Path(__file__).parent.parent / "data" / "out"
@@ -52,22 +52,22 @@ def _is_dev(response_id: str) -> bool:
 
 def build_ragtruth() -> tuple[list[dict], list[dict], list[dict]]:
     train, dev, test = [], [], []
-    for r in iter_rows("wandb/RAGTruth-processed", "default", "train"):
+    cols = ["id", "context", "output", "task_type", "hallucination_labels"]
+    for r in iter_parquet("wandb/RAGTruth-processed", "default", "train", columns=cols):
         if r["task_type"] in TASKS:
             (dev if _is_dev(r["id"]) else train).extend(ragtruth_claims(r))
-    for r in iter_rows("wandb/RAGTruth-processed", "default", "test"):
+    for r in iter_parquet("wandb/RAGTruth-processed", "default", "test", columns=cols):
         if r["task_type"] in TASKS:
             test.extend(ragtruth_claims(r))
     return train, dev, test
 
 
-def build_mnli(pages: int) -> list[dict]:
-    rows, stride = [], 392_000 // max(1, pages)
-    for p in range(pages):
-        for r in iter_rows("nyu-mll/multi_nli", "default", "train", limit=PAGE, start=p * stride):
-            rows.append({"premise": r["premise"], "hypothesis": r["hypothesis"],
-                         "label": 1 if r["label"] == 0 else 0, "source": "mnli"})
-    return rows
+def build_mnli(rows_wanted: int) -> list[dict]:
+    every = max(1, 392_702 // max(1, rows_wanted))          # MNLI train has 392,702 pairs
+    return [{"premise": r["premise"], "hypothesis": r["hypothesis"], "label": 1 if r["label"] == 0 else 0,
+             "source": "mnli"}
+            for r in iter_parquet("nyu-mll/multi_nli", "default", "train",
+                                  columns=["premise", "hypothesis", "label"], every=every)]
 
 
 def write(name: str, rows: list[dict]) -> None:
@@ -80,10 +80,12 @@ def write(name: str, rows: list[dict]) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mnli-pages", type=int, default=60, help="x100 MNLI rows mixed into training")
+    ap.add_argument("--mnli-rows", type=int, default=0,
+                    help="MNLI rows mixed into training (0 = none; downloads a 214 MB file, so use on a fast link)")
     args = ap.parse_args()
     train, dev, test = build_ragtruth()
-    train += build_mnli(args.mnli_pages)
+    if args.mnli_rows:
+        train += build_mnli(args.mnli_rows)
     write("train", train)
     write("dev", dev)
     write("test", test)

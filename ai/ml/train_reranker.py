@@ -1,25 +1,27 @@
 """
-ml/train_reranker.py — fine-tune a cross-encoder reranker (run on Colab/GPU, not in the service).
+ml/train_reranker.py — fine-tune a cross-encoder reranker (run on a Kaggle/Colab GPU, not in the service).
 
 Input: a JSONL file with one example per line:
     {"query": "...", "passage": "...", "label": 1}      # 1 = relevant, 0 = hard negative
-Hard negatives should come from the CURRENT retriever (chunks it ranked high that were marked not
-relevant), plus public data (MS MARCO / SQuAD) for the base model.
+Hard negatives come from the CURRENT first-stage retriever (ml/data/make_reranker_data.py mines them with BM25).
 
     pip install -r requirements-ml.txt
-    python -m ml.train_reranker --train data/train.jsonl --dev data/dev.jsonl \
+    python -m ml.train_reranker --train ml/data/out/train.jsonl --dev ml/data/out/dev.jsonl \
         --base cross-encoder/ms-marco-MiniLM-L-6-v2 --out models/reranker-v1
 
-The held-out TEST set must be fixed before any tuning and must never be passed here.
-The output directory is what RERANKER_MODEL points at.
+Loss: binary cross-entropy on one relevance logit per (query, passage). The best epoch is chosen by
+dev MRR@10 (queries are ranked among their own positives and negatives). The held-out TEST queries are
+never passed here. The output directory is what RERANKER_MODEL points at.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import random
 from pathlib import Path
+
+from ml.cross_encoder_train import train_cross_encoder
+from ml.eval.metrics import mrr_at_k
 
 
 def read_jsonl(path: str) -> list[dict]:
@@ -36,6 +38,27 @@ def read_jsonl(path: str) -> list[dict]:
     return rows
 
 
+def dev_mrr(dev: list[dict]):
+    """MRR@10 of ranking each dev query's candidates by the model's score."""
+    groups: dict[str, list[dict]] = {}
+    for r in dev:
+        groups.setdefault(r["query"], []).append(r)
+    groups = {q: g for q, g in groups.items() if any(r["label"] for r in g) and any(not r["label"] for r in g)}
+    flat = [(q, r["passage"]) for q, g in groups.items() for r in g]
+
+    def metric(predict):
+        scores = iter(predict(flat))
+        total = 0.0
+        for q, g in groups.items():
+            scored = [(next(scores), i) for i in range(len(g))]
+            ranked = [i for _, i in sorted(scored, reverse=True)]
+            total += mrr_at_k(ranked, {i for i, r in enumerate(g) if r["label"]}, 10)
+        mrr = total / max(1, len(groups))
+        return mrr, {"dev_mrr@10": round(mrr, 4), "dev_queries": len(groups)}
+
+    return metric
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--train", required=True)
@@ -45,34 +68,16 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=2)
     ap.add_argument("--batch-size", type=int, default=16)
     ap.add_argument("--lr", type=float, default=2e-5)
+    ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--no-fp16", action="store_true")
     args = ap.parse_args()
 
-    from sentence_transformers import InputExample
-    from sentence_transformers.cross_encoder import CrossEncoder
-    from sentence_transformers.cross_encoder.evaluation import CERerankingEvaluator
-    from torch.utils.data import DataLoader
-
-    random.seed(args.seed)
-    train = read_jsonl(args.train)
-    dev = read_jsonl(args.dev)
-    random.shuffle(train)
-
-    # Dev: group by query for a ranking metric (MRR@10) instead of a plain accuracy.
-    grouped: dict[str, dict] = {}
-    for r in dev:
-        g = grouped.setdefault(r["query"], {"query": r["query"], "positive": [], "negative": []})
-        g["positive" if r["label"] == 1 else "negative"].append(r["passage"])
-    samples = [g for g in grouped.values() if g["positive"] and g["negative"]]
-    evaluator = CERerankingEvaluator(samples, name="dev")
-
-    model = CrossEncoder(args.base, num_labels=1, max_length=512)   # one logit + BCE-with-logits loss
-    loader = DataLoader([InputExample(texts=[r["query"], r["passage"]], label=float(r["label"])) for r in train],
-                        shuffle=True, batch_size=args.batch_size)
-    model.fit(train_dataloader=loader, evaluator=evaluator, epochs=args.epochs,
-              warmup_steps=max(1, int(0.1 * len(loader))), optimizer_params={"lr": args.lr},
-              output_path=args.out, save_best_model=True)
-    print(f"saved best model to {args.out}")
+    train, dev = read_jsonl(args.train), read_jsonl(args.dev)
+    train_cross_encoder(
+        args.base, [(r["query"], r["passage"]) for r in train], [r["label"] for r in train], args.out,
+        dev_mrr(dev), epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
+        max_length=args.max_length, seed=args.seed, fp16=not args.no_fp16)
 
 
 if __name__ == "__main__":

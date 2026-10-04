@@ -6,8 +6,8 @@ ml/verifier/train_verifier.py — fine-tune the claim-support verifier (run on a
 
 Model: DeBERTa-v3-small as a cross-encoder with ONE logit trained with binary cross-entropy
 (sigmoid(logit) = probability the claim is SUPPORTED by the premise). Input is (premise, claim), truncated
-to --max-length tokens. The held-out TEST file (verifier_test.jsonl) is never passed here.
-The output directory is what VERIFIER_MODEL points at.
+to --max-length tokens. The best epoch is chosen by dev ROC-AUC. The held-out TEST file
+(verifier_test.jsonl) is never passed here. The output directory is what VERIFIER_MODEL points at.
 """
 
 from __future__ import annotations
@@ -16,6 +16,9 @@ import argparse
 import json
 import random
 from pathlib import Path
+
+from ml.cross_encoder_train import train_cross_encoder
+from ml.eval.classification import prf, roc_auc
 
 
 def read_jsonl(path: str) -> list[dict]:
@@ -26,6 +29,19 @@ def read_jsonl(path: str) -> list[dict]:
     if not rows:
         raise ValueError(f"{path} has no examples")
     return rows
+
+
+def dev_auc(dev: list[dict]):
+    pairs = [(r["premise"], r["hypothesis"]) for r in dev]
+    labels = [r["label"] for r in dev]
+
+    def metric(predict):
+        logits = predict(pairs)
+        auc = roc_auc(labels, logits)                       # how well P(supported) separates the two classes
+        m = prf([1 - y for y in labels], [1 if x < 0 else 0 for x in logits])   # unsupported = positive, thr 0.5
+        return auc, {"dev_auc": round(auc, 4), "dev_unsupported_f1@0.5": round(m["f1"], 4)}
+
+    return metric
 
 
 def main() -> None:
@@ -40,26 +56,16 @@ def main() -> None:
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--dev-size", type=int, default=3000, help="dev rows used for the per-epoch check")
     ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--no-fp16", action="store_true")
     args = ap.parse_args()
 
-    from sentence_transformers import InputExample
-    from sentence_transformers.cross_encoder import CrossEncoder
-    from sentence_transformers.cross_encoder.evaluation import CEBinaryClassificationEvaluator
-    from torch.utils.data import DataLoader
-
-    random.seed(args.seed)
     train, dev = read_jsonl(args.train), read_jsonl(args.dev)
-    random.shuffle(dev)
+    random.Random(args.seed).shuffle(dev)
     dev = dev[: args.dev_size]
-    evaluator = CEBinaryClassificationEvaluator([[r["premise"], r["hypothesis"]] for r in dev],
-                                                [r["label"] for r in dev], name="dev")
-    model = CrossEncoder(args.base, num_labels=1, max_length=args.max_length)
-    loader = DataLoader([InputExample(texts=[r["premise"], r["hypothesis"]], label=float(r["label"])) for r in train],
-                        shuffle=True, batch_size=args.batch_size)
-    model.fit(train_dataloader=loader, evaluator=evaluator, epochs=args.epochs,
-              warmup_steps=max(1, int(0.1 * len(loader))), optimizer_params={"lr": args.lr},
-              output_path=args.out, save_best_model=True)
-    print(f"saved best model to {args.out}")
+    train_cross_encoder(
+        args.base, [(r["premise"], r["hypothesis"]) for r in train], [r["label"] for r in train], args.out,
+        dev_auc(dev), epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
+        max_length=args.max_length, seed=args.seed, fp16=not args.no_fp16)
 
 
 if __name__ == "__main__":

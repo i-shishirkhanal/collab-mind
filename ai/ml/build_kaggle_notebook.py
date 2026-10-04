@@ -24,7 +24,7 @@ FILES = [
     "ml/__init__.py",
     "ml/data/__init__.py", "ml/data/hf_rows.py", "ml/data/scifact.py", "ml/data/make_reranker_data.py",
     "ml/eval/__init__.py", "ml/eval/bm25.py", "ml/eval/metrics.py", "ml/eval/classification.py",
-    "ml/eval/run_retrieval_eval.py", "ml/train_reranker.py",
+    "ml/eval/run_retrieval_eval.py", "ml/cross_encoder_train.py", "ml/train_reranker.py",
     "ml/verifier/__init__.py", "ml/verifier/sentences.py", "ml/verifier/make_data.py",
     "ml/verifier/train_verifier.py", "ml/verifier/evaluate.py",
 ]
@@ -47,7 +47,7 @@ def build() -> dict:
            "Built on public models and data, credited in the project report: `cross-encoder/ms-marco-MiniLM-L-6-v2` "
            "(Apache-2.0), `microsoft/deberta-v3-small` (MIT), `cross-encoder/nli-deberta-v3-small` (Apache-2.0), "
            "`BAAI/bge-small-en-v1.5` (MIT), BEIR SciFact (CC BY-NC 4.0), RAGTruth (MIT), MNLI."),
-        code('!pip -q install "sentence-transformers>=3.0,<4" httpx\n'
+        code('!pip -q install sentence-transformers httpx pyarrow sentencepiece\n'
              'import torch; print("GPU:", torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else "-")'),
         md("## 1. Write the project code"),
         code("import json, os\nfrom pathlib import Path\n"
@@ -60,7 +60,7 @@ def build() -> dict:
              "print(len(FILES), 'files written')"),
         md("## 2. Build datasets (public data; rate-limited, takes a while)"),
         code("!python -m ml.data.make_reranker_data"),
-        code("!python -m ml.verifier.make_data"),
+        code("!python -m ml.verifier.make_data --mnli-rows 6000"),
         md("## 3. Train the reranker (M1)"),
         code("!python -m ml.train_reranker --train ml/data/out/train.jsonl --dev ml/data/out/dev.jsonl "
              "--base cross-encoder/ms-marco-MiniLM-L-6-v2 --out models/reranker-v1 --epochs 2"),
@@ -86,10 +86,75 @@ def build() -> dict:
                                          "language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}
 
 
+SINGLE_CELL_RUNNER = '''
+import base64, zlib, json, os, subprocess, shutil, time
+from pathlib import Path
+
+ROOT = Path("/kaggle/working/ai")
+for rel, text in json.loads(zlib.decompress(base64.b64decode(BLOB))).items():
+    p = ROOT / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
+os.chdir(ROOT)
+status = {}
+
+
+def sh(name, cmd):
+    print("\\n" + "=" * 70 + "\\n[" + name + "] $ " + cmd + "\\n" + "=" * 70, flush=True)
+    t0 = time.time()
+    rc = subprocess.run(cmd, shell=True).returncode
+    status[name] = "ok" if rc == 0 else "FAILED (exit %d)" % rc
+    print("[%s] %s after %.0fs" % (name, status[name], time.time() - t0), flush=True)
+    return rc == 0
+
+
+sh("install", "pip -q install sentence-transformers httpx pyarrow sentencepiece")
+import torch
+print("GPU available:", torch.cuda.is_available(), flush=True)
+
+# ---- M1: reranker -------------------------------------------------------------------------------
+ok = sh("m1-data", "python -m ml.data.make_reranker_data")
+tuned = ok and sh("m1-train", "python -m ml.train_reranker --train ml/data/out/train.jsonl --dev ml/data/out/dev.jsonl "
+                  "--base cross-encoder/ms-marco-MiniLM-L-6-v2 --out models/reranker-v1 --epochs 2")
+rerankers = "--rerank cross-encoder/ms-marco-MiniLM-L-6-v2" + (" --rerank models/reranker-v1" if tuned else "")
+sh("m1-eval", "python -m ml.eval.run_retrieval_eval --dense BAAI/bge-small-en-v1.5 " + rerankers)
+
+# ---- M2: claim verifier -------------------------------------------------------------------------
+ok = sh("m2-data", "python -m ml.verifier.make_data --mnli-rows 6000")
+tuned = ok and sh("m2-train", "python -m ml.verifier.train_verifier --train ml/data/out/verifier_train.jsonl "
+                  "--dev ml/data/out/verifier_dev.jsonl --out models/verifier-v1 --epochs 2")
+if ok:
+    sh("m2-eval", "python -m ml.verifier.evaluate" + (" --model models/verifier-v1" if tuned else ""))
+
+# ---- package ------------------------------------------------------------------------------------
+for f in ("retrieval_results.md", "retrieval_results.json", "verifier_results.md", "verifier_results.json"):
+    if Path("ml/data/out", f).exists():
+        shutil.copy(Path("ml/data/out", f), "/kaggle/working/" + f)
+if Path("models").exists():
+    shutil.make_archive("/kaggle/working/collabmind_models", "zip", "models")
+Path("/kaggle/working/run_status.json").write_text(json.dumps(status, indent=2))
+print("\\n\\nSTATUS", json.dumps(status, indent=2))
+for f in ("retrieval_results.md", "verifier_results.md"):
+    q = Path("/kaggle/working") / f
+    print("\\n" + f + "\\n" + (q.read_text() if q.exists() else "(missing)"))
+'''
+
+
+def single_cell() -> str:
+    import base64
+    import zlib
+
+    files = {p: (ROOT / p).read_text(encoding="utf-8") for p in FILES}
+    blob = base64.b64encode(zlib.compress(json.dumps(files).encode("utf-8"), 9)).decode("ascii")
+    return f'BLOB = "{blob}"\n' + SINGLE_CELL_RUNNER
+
+
 def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(build(), indent=1), encoding="utf-8")
-    print(f"wrote {OUT} ({OUT.stat().st_size // 1024} KB)")
+    cell = OUT.with_name("collabmind_ml_single_cell.py")
+    cell.write_text(single_cell(), encoding="utf-8")
+    print(f"wrote {OUT} ({OUT.stat().st_size // 1024} KB) and {cell.name} ({cell.stat().st_size // 1024} KB)")
 
 
 if __name__ == "__main__":
