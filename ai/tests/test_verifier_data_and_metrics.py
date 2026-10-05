@@ -68,3 +68,36 @@ def test_bootstrap_stat_ci_for_a_custom_statistic():
     labels = [1] * 30 + [0] * 70
     value, lo, hi = stats.bootstrap_stat_ci(100, lambda idx: sum(labels[i] for i in idx) / len(idx), n_boot=300)
     assert value == pytest.approx(0.3) and lo < 0.3 < hi
+
+
+def test_platt_scaling_fixes_an_overconfident_scorer():
+    import random
+
+    from ml.calibration import platt
+
+    rng = random.Random(3)
+    probs, labels = [], []
+    for _ in range(4000):
+        true_p = rng.random()
+        labels.append(1 if rng.random() < true_p else 0)
+        probs.append(min(0.999, max(0.001, 0.5 + (true_p - 0.5) * 2.2)))      # overconfident: pushed toward 0 / 1
+    a, b = platt.fit(probs[:2000], labels[:2000])
+    assert 0 < a < 1                                                         # shrinks the logits
+    raw_ece = c.ece(labels[2000:], probs[2000:])
+    cal_ece = c.ece(labels[2000:], [platt.apply(p, a, b) for p in probs[2000:]])
+    assert cal_ece < raw_ece / 2
+    assert platt.brier([1.0, 0.0], [1, 0]) == 0.0
+    with pytest.raises(ValueError):
+        platt.fit([0.2, 0.9], [1, 1])
+
+
+def test_biencoder_triplets_pair_each_positive_with_a_hard_negative_of_the_same_query():
+    from ml.train_biencoder import build_triplets
+
+    rows = [{"query": "q1", "passage": "p1", "label": 1}, {"query": "q1", "passage": "n1", "label": 0},
+            {"query": "q1", "passage": "n2", "label": 0}, {"query": "q2", "passage": "p2", "label": 1},
+            {"query": "q3", "passage": "n3", "label": 0}]            # q2 has no negative, q3 no positive
+    t = build_triplets(rows, seed=1)
+    assert t == [("q1", "p1", t[0][2])] and t[0][2] in {"n1", "n2"}
+    with pytest.raises(ValueError):
+        build_triplets([{"query": "q", "passage": "p", "label": 1}], seed=1)

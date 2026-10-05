@@ -40,7 +40,7 @@ def rrf(*rankings: list[str], k: int = RRF_K) -> list[str]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dense", help="sentence-transformers bi-encoder id/path (optional)")
+    ap.add_argument("--dense", action="append", default=[], help="sentence-transformers bi-encoder id/path; repeatable")
     ap.add_argument("--rerank", action="append", default=[], help="cross-encoder id/path; repeatable")
     ap.add_argument("--candidates", type=int, default=50, help="first-stage depth given to the reranker")
     ap.add_argument("--limit", type=int, default=0, help="evaluate only the first N test queries (smoke test)")
@@ -55,14 +55,15 @@ def main() -> None:
     if args.dense:
         from sentence_transformers import SentenceTransformer
 
-        enc = SentenceTransformer(args.dense)
         ids = list(corpus)
-        doc_vecs = enc.encode([corpus[i] for i in ids], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
-        q_vecs = enc.encode([queries[q] for q in qids], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
-        sims = q_vecs @ doc_vecs.T
-        dense = {q: [ids[j] for j in sims[n].argsort()[::-1][:depth]] for n, q in enumerate(qids)}
-        first_stage[f"dense:{args.dense}"] = dense
-        first_stage[f"hybrid:{args.dense}"] = {q: rrf(first_stage["bm25"][q], dense[q])[:depth] for q in qids}
+        for dense_name in args.dense:
+            enc = SentenceTransformer(dense_name)
+            doc_vecs = enc.encode([corpus[i] for i in ids], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
+            q_vecs = enc.encode([queries[q] for q in qids], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
+            sims = q_vecs @ doc_vecs.T
+            dense = {q: [ids[j] for j in sims[n].argsort()[::-1][:depth]] for n, q in enumerate(qids)}
+            first_stage[f"dense:{dense_name}"] = dense
+            first_stage[f"hybrid:{dense_name}"] = {q: rrf(first_stage["bm25"][q], dense[q])[:depth] for q in qids}
 
     results: list[dict] = []
     per_query: dict[str, list[float]] = {}          # system -> NDCG@10 per test query (same order as qids)

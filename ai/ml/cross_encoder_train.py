@@ -22,8 +22,14 @@ import time
 from pathlib import Path
 from typing import Callable, Sequence
 
-Pair = tuple[str, str]
+Pair = tuple[str, "str | None"]            # (text_a, text_b); text_b is None for single-text classifiers
 Predict = Callable[[Sequence[Pair]], list[float]]       # (text_a, text_b) pairs -> raw logits
+
+
+def _encode(tokenizer, batch: Sequence[Pair], max_length: int):
+    second = [p[1] for p in batch]
+    return tokenizer([p[0] for p in batch], None if all(x is None for x in second) else second,
+                     truncation="longest_first", max_length=max_length, padding=True, return_tensors="pt")
 
 
 def make_predict(model, tokenizer, device, max_length: int, batch_size: int = 64) -> Predict:
@@ -33,12 +39,11 @@ def make_predict(model, tokenizer, device, max_length: int, batch_size: int = 64
         was_training = model.training
         model.eval()
         out: list[float] = []
-        order = sorted(range(len(pairs)), key=lambda i: len(pairs[i][0]) + len(pairs[i][1]))   # less padding
+        order = sorted(range(len(pairs)), key=lambda i: len(pairs[i][0]) + len(pairs[i][1] or ""))   # less padding
         with torch.no_grad():
             for s in range(0, len(order), batch_size):
                 idx = order[s:s + batch_size]
-                enc = tokenizer([pairs[i][0] for i in idx], [pairs[i][1] for i in idx], truncation="longest_first",
-                                max_length=max_length, padding=True, return_tensors="pt").to(device)
+                enc = _encode(tokenizer, [pairs[i] for i in idx], max_length).to(device)
                 logits = model(**enc).logits.view(-1).float().cpu().tolist()
                 out.extend(zip(idx, logits))
         model.train(was_training)
@@ -103,8 +108,7 @@ def train_cross_encoder(
         running, t0 = 0.0, time.time()
         for step, s in enumerate(range(0, len(order), batch_size), start=1):
             idx = order[s:s + batch_size]
-            enc = tokenizer([pairs[i][0] for i in idx], [pairs[i][1] for i in idx], truncation="longest_first",
-                            max_length=max_length, padding=True, return_tensors="pt").to(device)
+            enc = _encode(tokenizer, [pairs[i] for i in idx], max_length).to(device)
             y = torch.tensor([float(labels[i]) for i in idx], device=device)
             with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=use_amp):
                 logits = model(**enc).logits.view(-1)
@@ -131,3 +135,14 @@ def train_cross_encoder(
     Path(out_dir, "training_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
     print(f"best epoch {best_epoch} (dev_score={best:.4f}) saved to {out_dir}", flush=True)
     return {"best_score": best, "best_epoch": best_epoch, "history": history}
+
+
+def load_predict(path: str, max_length: int = 256, batch_size: int = 32) -> Predict:
+    """Raw-logit predictor for a model folder written by train_cross_encoder (pair or single-text input)."""
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tokenizer = AutoTokenizer.from_pretrained(path)
+    model = AutoModelForSequenceClassification.from_pretrained(path).float().to(device).eval()
+    return make_predict(model, tokenizer, device, max_length, batch_size)

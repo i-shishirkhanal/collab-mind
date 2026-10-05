@@ -101,6 +101,14 @@ def claims_with_citations(answer: str, max_claims: int) -> list[tuple[str, list[
     return out
 
 
+def _calibrate(p: float, a: float, b: float) -> float:
+    """Platt scaling sigmoid(a*logit(p)+b); the identity (a=1, b=0) is the default. Fitted by ml/calibration/."""
+    if (a, b) == (1.0, 0.0):
+        return p
+    p = min(1 - 1e-6, max(1e-6, p))
+    return 1 / (1 + math.exp(-(a * math.log(p / (1 - p)) + b)))
+
+
 def _premise(claim: str, cited: list[int], passages: list[dict]) -> str:
     texts = [passages[n - 1]["content"] for n in cited if 1 <= n <= len(passages)]
     if not texts:
@@ -127,6 +135,7 @@ async def verify_answer(cfg: VerifierSettings, answer: str, passages: list[dict]
     except Exception:  # noqa: BLE001
         log.warning("verification failed; answer left unscored", exc_info=True)
         return None
+    probs = [_calibrate(float(p), cfg.calib_a, cfg.calib_b) for p in probs]
     verdicts = [ClaimVerdict(text, float(p), float(p) >= cfg.threshold, cited)
                 for (text, cited), p in zip(claims, probs)]
     unsupported = [v for v in verdicts if not v.supported]

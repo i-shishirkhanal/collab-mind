@@ -31,6 +31,7 @@ from schemas import (
     StudyGuideRequest, StudyGuideResponse,
     ReportRequest, ReportResponse,
     SummarizeRequest, SummarizeResponse,
+    WhiteboardRequest, WhiteboardResponse,
 )
 
 SUMMARY_MAX_CHARS = 60_000
@@ -207,6 +208,72 @@ async def generate_study_guide(pool: asyncpg.Pool, request: StudyGuideRequest) -
     )
     return await _generate_json(pool, request.workspace_id, "study_guide", Task.STUDY, system, user,
                                 StudyGuideResponse, user_id=request.user_id)
+
+
+WB_MAX_DEPTH = 3
+WB_LABEL_MAX = 60
+
+
+def _clean_mind_map(nodes: list, max_nodes: int) -> list:
+    """Keep one connected tree: a single root, known parents, no cycles, bounded depth and size.
+    Anything that does not fit is dropped rather than repaired, so the board never shows a broken map."""
+    by_id = {}
+    for n in nodes:
+        n.id, n.label = str(n.id).strip(), " ".join(n.label.split())[:WB_LABEL_MAX]
+        if n.id and n.label and n.id not in by_id:
+            by_id[n.id] = n
+    roots = [n for n in by_id.values() if not n.parent]
+    if not roots:
+        return []
+    root = roots[0]
+    kept, depth = [root], {root.id: 0}
+    pending = [n for n in by_id.values() if n is not root and n.parent]
+    progressed = True
+    while pending and progressed and len(kept) < max_nodes:  # parents may be listed after their children
+        progressed, rest = False, []
+        for n in pending:
+            if n.parent in depth and depth[n.parent] < WB_MAX_DEPTH and len(kept) < max_nodes:
+                depth[n.id] = depth[n.parent] + 1
+                kept.append(n)
+                progressed = True
+            else:
+                rest.append(n)
+        pending = rest
+    return kept
+
+
+async def generate_whiteboard(pool: asyncpg.Pool, request: WhiteboardRequest) -> WhiteboardResponse:
+    """A mind map outline (structure only, no coordinates; the client lays it out) grounded in the sources."""
+    context, chunks = await _get_context(pool, request.workspace_id, request.topic, top_k=25)
+    system = ("You turn workspace notes into a mind map. Use ONLY the workspace context; every node must "
+              "be supported by it. Labels are short phrases (max 8 words). Exactly one root node has "
+              "parent null; every other node's parent is the id of another node. Use at most 3 levels. "
+              f"source_ref must be the exact source name a node came from. {_JSON_NOTE}")
+    user = (
+        f"Mind map of {json.dumps(request.topic)} with at most {request.max_nodes} nodes.\n\n{context}\n\n"
+        'JSON schema: {"title": "string", "nodes": [{"id": "string", "label": "string", '
+        '"parent": "id or null", "source_ref": "source name"}]}'
+    )
+    result = await _generate_json(pool, request.workspace_id, "whiteboard", Task.STUDY, system, user,
+                                  WhiteboardResponse, user_id=request.user_id)
+    nodes = _clean_mind_map(result.nodes, request.max_nodes)
+    if len(nodes) < 2:
+        raise errors.MalformedResponseError("The model produced no usable mind map.")
+    for n in nodes:
+        n.source_ref = _resolve_ref(n.source_ref, chunks)
+    # Grounded only: a branch whose source is not in the retrieved context is dropped with its
+    # descendants (parents always precede children in `nodes`). The root is just the topic heading.
+    kept_ids = {nodes[0].id}
+    grounded = [nodes[0]]
+    for n in nodes[1:]:
+        if n.parent in kept_ids and n.source_ref != UNVERIFIED:
+            kept_ids.add(n.id)
+            grounded.append(n)
+    if len(grounded) < 2:
+        raise NoRelevantSourcesError("The workspace sources do not cover that topic well enough to map it.")
+    result.nodes = grounded
+    result.title = " ".join(result.title.split())[:WB_LABEL_MAX] or request.topic[:WB_LABEL_MAX]
+    return result
 
 
 async def generate_report(pool: asyncpg.Pool, request: ReportRequest) -> ReportResponse:

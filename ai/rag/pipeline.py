@@ -20,6 +20,7 @@ from llm.router import classify_task
 from llm.types import Completion, Route, StreamEvent, Task, Usage
 from rag import grounding
 from rag.grounding import NO_ANSWER, Grounded, build_messages, citation_for, select_passages
+from rag.injection import screen_passages
 from rag.reranker import candidates_needed, rerank_chunks
 from rag.retriever import retrieve_chunks
 from rag.usage import record_usage
@@ -50,6 +51,7 @@ class Prepared:
     messages: Optional[list[dict]] = None
     passages: Optional[list[dict]] = None
     task: Optional[Task] = None
+    warnings: list[str] = field(default_factory=list)
 
 
 def _extract_citations(chunks: list[dict]) -> list[Citation]:
@@ -73,22 +75,26 @@ async def prepare(
     chunks = await retrieve_chunks(pool, workspace_id, message,
                                    top_k=candidates_needed(cfg.retrieval, top_k), source_ids=source_ids)
     chunks, _ = await rerank_chunks(cfg.retrieval, message, chunks, top_k)   # no-op unless RERANKER_ENABLED
+    screen = await screen_passages(cfg.injection, chunks)                    # no-op unless INJECTION_DETECTOR_ENABLED
+    chunks = screen.kept
+    notes = ([f"{len(screen.withheld)} retrieved passage(s) were withheld because they look like instructions "
+              "to the AI rather than study material."] if screen.withheld else [])
     if not chunks:
         return Prepared(early=RagResult(
             answer=NO_SOURCES_ANSWER, citations=[], grounding="no_sources", task=chosen_task,
-            warnings=["No sufficiently relevant passages were found in the workspace sources."],
+            warnings=notes or ["No sufficiently relevant passages were found in the workspace sources."],
         ))
     passages = select_passages(chunks, cfg.retrieval.context_max_chars)
     return Prepared(
         messages=build_messages(message, passages, conversation_history),
-        passages=passages, task=chosen_task,
+        passages=passages, task=chosen_task, warnings=notes,
     )
 
 
 def _finish(prep: Prepared, completion_text: str, route: Route, usage: Usage) -> RagResult:
     g: Grounded = grounding.resolve_citations(completion_text, prep.passages or [])
     return RagResult(answer=g.answer, citations=g.citations, grounding=g.grounding,
-                     warnings=g.warnings, task=prep.task, route=route, usage=usage)
+                     warnings=[*prep.warnings, *g.warnings], task=prep.task, route=route, usage=usage)
 
 
 async def _verified(result: RagResult, passages: Optional[list[dict]]) -> RagResult:

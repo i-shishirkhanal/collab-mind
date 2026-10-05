@@ -24,9 +24,13 @@ FILES = [
     "ml/__init__.py",
     "ml/data/__init__.py", "ml/data/hf_rows.py", "ml/data/scifact.py", "ml/data/make_reranker_data.py",
     "ml/eval/__init__.py", "ml/eval/bm25.py", "ml/eval/metrics.py", "ml/eval/classification.py", "ml/eval/stats.py",
-    "ml/eval/run_retrieval_eval.py", "ml/cross_encoder_train.py", "ml/train_reranker.py",
+    "ml/eval/run_retrieval_eval.py", "ml/cross_encoder_train.py", "ml/train_reranker.py", "ml/train_biencoder.py",
     "ml/verifier/__init__.py", "ml/verifier/sentences.py", "ml/verifier/make_data.py",
     "ml/verifier/train_verifier.py", "ml/verifier/evaluate.py",
+    "ml/calibration/__init__.py", "ml/calibration/platt.py", "ml/calibration/calibrate_verifier.py",
+    "ml/injection/__init__.py", "ml/injection/heuristic.py", "ml/injection/make_data.py",
+    "ml/injection/train_injection.py", "ml/injection/evaluate.py",
+    "ml/data/indomain/chunks.jsonl",       # benign study chunks (CC BY-SA Wikipedia) for the poisoned-chunk injection test
 ]
 
 
@@ -84,25 +88,39 @@ print("GPU available:", torch.cuda.is_available(), flush=True)
 ok = sh("m1-data", "python -m ml.data.make_reranker_data")
 tuned = ok and sh("m1-train", "python -m ml.train_reranker --train ml/data/out/train.jsonl --dev ml/data/out/dev.jsonl "
                   "--base cross-encoder/ms-marco-MiniLM-L-6-v2 --out models/reranker-v1 --epochs 2")
+tuned_bi = ok and sh("m1-biencoder", "python -m ml.train_biencoder --train ml/data/out/train.jsonl "
+                     "--base BAAI/bge-small-en-v1.5 --out models/biencoder-v1 --epochs 3")
 rerankers = "--rerank cross-encoder/ms-marco-MiniLM-L-6-v2" + (" --rerank models/reranker-v1" if tuned else "")
-sh("m1-eval", "python -m ml.eval.run_retrieval_eval --dense BAAI/bge-small-en-v1.5 " + rerankers)
+dense = "--dense BAAI/bge-small-en-v1.5" + (" --dense models/biencoder-v1" if tuned_bi else "")
+sh("m1-eval", "python -m ml.eval.run_retrieval_eval " + dense + " " + rerankers)
 
 # ---- M2: claim verifier -------------------------------------------------------------------------
 ok = sh("m2-data", "python -m ml.verifier.make_data --mnli-rows 6000")
 tuned = ok and sh("m2-train", "python -m ml.verifier.train_verifier --train ml/data/out/verifier_train.jsonl "
                   "--dev ml/data/out/verifier_dev.jsonl --out models/verifier-v1 --epochs 2")
 if ok:
-    sh("m2-eval", "python -m ml.verifier.evaluate --save-scores ml/data/out/verifier_scores.json" + (" --model models/verifier-v1" if tuned else ""))
+    scored = sh("m2-eval", "python -m ml.verifier.evaluate --save-scores ml/data/out/verifier_scores.json" + (" --model models/verifier-v1" if tuned else ""))
+    if tuned and scored:
+        sh("m3-calibration", "python -m ml.calibration.calibrate_verifier --scores ml/data/out/verifier_scores.json")
+
+# ---- prompt-injection detector (the poisoned-chunk test is skipped here: it needs the local Wikipedia kit) ----
+ok = sh("inj-data", "python -m ml.injection.make_data")
+tuned = ok and sh("inj-train", "python -m ml.injection.train_injection --train ml/data/out/injection_train.jsonl "
+                  "--dev ml/data/out/injection_dev.jsonl --out models/injection-v1 --epochs 3")
+if ok:
+    sh("inj-eval", "python -m ml.injection.evaluate" + (" --model models/injection-v1" if tuned else ""))
 
 # ---- package ------------------------------------------------------------------------------------
-for f in ("retrieval_results.md", "retrieval_results.json", "retrieval_per_query_ndcg10.json", "verifier_results.md", "verifier_results.json", "verifier_scores.json"):
+for f in ("retrieval_results.md", "retrieval_results.json", "retrieval_per_query_ndcg10.json", "verifier_results.md",
+          "verifier_results.json", "verifier_scores.json", "calibration_results.md", "calibration_results.json",
+          "injection_results.md", "injection_results.json", "injection_test_poisoned.jsonl"):
     if Path("ml/data/out", f).exists():
         shutil.copy(Path("ml/data/out", f), "/kaggle/working/" + f)
 if Path("models").exists():
     shutil.make_archive("/kaggle/working/collabmind_models", "zip", "models")
 Path("/kaggle/working/run_status.json").write_text(json.dumps(status, indent=2))
 print("\\n\\nSTATUS", json.dumps(status, indent=2))
-for f in ("retrieval_results.md", "verifier_results.md"):
+for f in ("retrieval_results.md", "verifier_results.md", "calibration_results.md", "injection_results.md"):
     q = Path("/kaggle/working") / f
     print("\\n" + f + "\\n" + (q.read_text() if q.exists() else "(missing)"))
 '''

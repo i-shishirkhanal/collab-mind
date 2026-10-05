@@ -122,6 +122,17 @@ class VerifierSettings:
     model: str = ""             # local path or Hugging Face id of the fine-tuned verifier
     threshold: float = 0.5      # P(supported) below this flags a claim; tune on the dev set
     max_claims: int = 12        # claims scored per answer (bounds CPU latency)
+    calib_a: float = 1.0        # optional Platt scaling of P(supported): sigmoid(a*logit(p)+b), fitted on dev
+    calib_b: float = 0.0        # (ml/calibration/calibrate_verifier.py prints both; 1.0 / 0.0 = off)
+
+
+@dataclass(frozen=True)
+class InjectionSettings:
+    """Optional learned prompt-injection screen of retrieved passages (rag/injection.py). Off by default."""
+    enabled: bool = False
+    model: str = ""             # local folder of the fine-tuned detector
+    threshold: float = 0.5      # a passage whose worst window scores >= this is withheld from the model
+    window_chars: int = 1200    # scan window; the detector reads ~256 tokens at a time
 
 
 @dataclass(frozen=True)
@@ -130,6 +141,7 @@ class Settings:
     embedding: EmbeddingSettings
     retrieval: RetrievalSettings
     verifier: VerifierSettings = VerifierSettings()
+    injection: InjectionSettings = InjectionSettings()
 
     def validate_for_serving(self) -> list[str]:
         """Return non-fatal problems (missing credentials). The service still
@@ -194,11 +206,22 @@ def load_settings() -> Settings:
         model=_str("VERIFIER_MODEL"),
         threshold=_float("VERIFIER_THRESHOLD", 0.5, min_value=0, max_value=1),
         max_claims=_int("VERIFIER_MAX_CLAIMS", 12, min_value=1, max_value=50),
+        calib_a=_float("VERIFIER_CALIB_A", 1.0, min_value=-100, max_value=100),
+        calib_b=_float("VERIFIER_CALIB_B", 0.0, min_value=-100, max_value=100),
     )
     if verifier.enabled and not verifier.model:
         raise ConfigError("VERIFIER_ENABLED is true but VERIFIER_MODEL is not set")
 
-    return Settings(llm=llm, embedding=embedding, retrieval=retrieval, verifier=verifier)
+    injection = InjectionSettings(
+        enabled=_bool("INJECTION_DETECTOR_ENABLED", False),
+        model=_str("INJECTION_DETECTOR_MODEL"),
+        threshold=_float("INJECTION_DETECTOR_THRESHOLD", 0.5, min_value=0, max_value=1),
+        window_chars=_int("INJECTION_DETECTOR_WINDOW_CHARS", 1200, min_value=200, max_value=8000),
+    )
+    if injection.enabled and not injection.model:
+        raise ConfigError("INJECTION_DETECTOR_ENABLED is true but INJECTION_DETECTOR_MODEL is not set")
+
+    return Settings(llm=llm, embedding=embedding, retrieval=retrieval, verifier=verifier, injection=injection)
 
 
 @lru_cache(maxsize=1)
