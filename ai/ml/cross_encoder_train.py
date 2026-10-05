@@ -78,7 +78,8 @@ def train_cross_encoder(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = fp16 and device.type == "cuda"
     tokenizer = AutoTokenizer.from_pretrained(base)
-    model = AutoModelForSequenceClassification.from_pretrained(base, num_labels=1, ignore_mismatched_sizes=True).to(device)
+    model = AutoModelForSequenceClassification.from_pretrained(base, num_labels=1, ignore_mismatched_sizes=True)
+    model = model.float().to(device)    # fp32 master weights: GradScaler refuses fp16 parameters (newer transformers may load them)
     predict = make_predict(model, tokenizer, device, max_length)
 
     steps_per_epoch = math.ceil(len(pairs) / batch_size)

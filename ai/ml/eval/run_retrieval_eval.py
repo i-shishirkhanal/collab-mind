@@ -23,7 +23,8 @@ from pathlib import Path
 
 from ml.data import scifact
 from ml.eval.bm25 import BM25
-from ml.eval.metrics import evaluate
+from ml.eval.metrics import evaluate, ndcg_at_k
+from ml.eval.stats import bootstrap_ci, paired_bootstrap
 
 OUT = Path(__file__).parent.parent / "data" / "out"
 RRF_K = 60
@@ -64,10 +65,13 @@ def main() -> None:
         first_stage[f"hybrid:{args.dense}"] = {q: rrf(first_stage["bm25"][q], dense[q])[:depth] for q in qids}
 
     results: list[dict] = []
+    per_query: dict[str, list[float]] = {}          # system -> NDCG@10 per test query (same order as qids)
 
     def record(name: str, ranked_by_q: dict[str, list[str]], latency_ms: float = 0.0) -> None:
         metrics = evaluate([(ranked_by_q[q], qrels[q]) for q in qids])
-        results.append({"system": name, **metrics, "latency_ms": round(latency_ms, 1)})
+        per_query[name] = [ndcg_at_k(ranked_by_q[q], qrels[q], 10) for q in qids]
+        _, lo, hi = bootstrap_ci(per_query[name])
+        results.append({"system": name, **metrics, "ndcg_lo": lo, "ndcg_hi": hi, "latency_ms": round(latency_ms, 1)})
         print(f"{name:<60} MRR@10={metrics['mrr@10']:.3f} NDCG@10={metrics['ndcg@10']:.3f} R@10={metrics['recall@10']:.3f}")
 
     for name, ranked in first_stage.items():
@@ -88,13 +92,24 @@ def main() -> None:
             record(f"{stage}+rerank:{model_name}", reranked, 1000 * spent / len(qids))
 
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "retrieval_results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
-    cols = ["recall@1", "recall@5", "recall@10", "mrr@10", "ndcg@10", "latency_ms"]
-    lines = ["| system | " + " | ".join(cols) + " |", "|---|" + "---|" * len(cols)]
+    ref = results[0]["system"]                       # paired comparisons are against the first system (BM25)
     for r in results:
-        lines.append(f"| {r['system']} | " + " | ".join(f"{r[c]:.3f}" if c != "latency_ms" else f"{r[c]:.0f}" for c in cols) + " |")
-    (OUT / "retrieval_results.md").write_text("\n".join(lines) + f"\n\nTest queries: {len(qids)} (BEIR SciFact test)\n", encoding="utf-8")
-    print("\n" + "\n".join(lines))
+        d = paired_bootstrap(per_query[r["system"]], per_query[ref])
+        r.update({"delta_vs_ref": d["diff"], "delta_lo": d["lo"], "delta_hi": d["hi"], "delta_p": d["p"]})
+    (OUT / "retrieval_results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    (OUT / "retrieval_per_query_ndcg10.json").write_text(json.dumps({"qids": qids, "ndcg@10": per_query}), encoding="utf-8")
+    cols = ["recall@1", "recall@10", "mrr@10"]
+    head = ["system", *cols, "ndcg@10 [95% CI]", f"delta vs {ref} [95% CI]", "p", "latency_ms"]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for r in results:
+        sig = "" if r["system"] == ref else f"{r['delta_vs_ref']:+.3f} [{r['delta_lo']:+.3f}, {r['delta_hi']:+.3f}]"
+        pval = "" if r["system"] == ref else f"{r['delta_p']:.3f}"
+        lines.append(f"| {r['system']} | " + " | ".join(f"{r[c]:.3f}" for c in cols)
+                     + f" | {r['ndcg@10']:.3f} [{r['ndcg_lo']:.3f}, {r['ndcg_hi']:.3f}] | {sig} | {pval} | {r['latency_ms']:.0f} |")
+    note = (f"Test queries: {len(qids)} (BEIR SciFact test). Intervals are 95% percentile bootstrap over queries; the delta "
+            "column is a paired bootstrap against the first row. A difference is only claimed when its interval excludes 0.")
+    (OUT / "retrieval_results.md").write_text("\n".join(lines) + "\n\n" + note + "\n", encoding="utf-8")
+    print("\n" + "\n".join(lines) + "\n\n" + note)
 
 
 if __name__ == "__main__":

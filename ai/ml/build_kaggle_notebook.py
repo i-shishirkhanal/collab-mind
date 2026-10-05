@@ -23,7 +23,7 @@ OUT = Path(__file__).parent / "kaggle" / "collabmind_ml_training.ipynb"
 FILES = [
     "ml/__init__.py",
     "ml/data/__init__.py", "ml/data/hf_rows.py", "ml/data/scifact.py", "ml/data/make_reranker_data.py",
-    "ml/eval/__init__.py", "ml/eval/bm25.py", "ml/eval/metrics.py", "ml/eval/classification.py",
+    "ml/eval/__init__.py", "ml/eval/bm25.py", "ml/eval/metrics.py", "ml/eval/classification.py", "ml/eval/stats.py",
     "ml/eval/run_retrieval_eval.py", "ml/cross_encoder_train.py", "ml/train_reranker.py",
     "ml/verifier/__init__.py", "ml/verifier/sentences.py", "ml/verifier/make_data.py",
     "ml/verifier/train_verifier.py", "ml/verifier/evaluate.py",
@@ -43,44 +43,12 @@ def build() -> dict:
     files = {p: (ROOT / p).read_text(encoding="utf-8") for p in FILES}
     cells = [
         md("# CollabMind: reranker + claim verifier training\n"
-           "Settings: **Accelerator = GPU T4 x2**, **Internet = On**. Then *Run All*. Expect roughly 1 to 2 hours.\n\n"
+           "Settings: **Accelerator = GPU T4 x2**, **Internet = On**. Then *Save Version -> Save & Run All* (runs unattended). "
+           "Expect about 30 to 60 minutes. Stages are independent, so one failure does not stop the others.\n\n"
            "Built on public models and data, credited in the project report: `cross-encoder/ms-marco-MiniLM-L-6-v2` "
            "(Apache-2.0), `microsoft/deberta-v3-small` (MIT), `cross-encoder/nli-deberta-v3-small` (Apache-2.0), "
-           "`BAAI/bge-small-en-v1.5` (MIT), BEIR SciFact (CC BY-NC 4.0), RAGTruth (MIT), MNLI."),
-        code('!pip -q install sentence-transformers httpx pyarrow sentencepiece\n'
-             'import torch; print("GPU:", torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else "-")'),
-        md("## 1. Write the project code"),
-        code("import json, os\nfrom pathlib import Path\n"
-             f"FILES = json.loads({json.dumps(json.dumps(files))})\n"
-             "for rel, text in FILES.items():\n"
-             "    p = Path('/kaggle/working/ai') / rel\n"
-             "    p.parent.mkdir(parents=True, exist_ok=True)\n"
-             "    p.write_text(text, encoding='utf-8')\n"
-             "os.chdir('/kaggle/working/ai')\n"
-             "print(len(FILES), 'files written')"),
-        md("## 2. Build datasets (public data; rate-limited, takes a while)"),
-        code("!python -m ml.data.make_reranker_data"),
-        code("!python -m ml.verifier.make_data --mnli-rows 6000"),
-        md("## 3. Train the reranker (M1)"),
-        code("!python -m ml.train_reranker --train ml/data/out/train.jsonl --dev ml/data/out/dev.jsonl "
-             "--base cross-encoder/ms-marco-MiniLM-L-6-v2 --out models/reranker-v1 --epochs 2"),
-        md("## 4. Retrieval ablation on held-out SciFact test queries"),
-        code("!python -m ml.eval.run_retrieval_eval --dense BAAI/bge-small-en-v1.5 "
-             "--rerank cross-encoder/ms-marco-MiniLM-L-6-v2 --rerank models/reranker-v1"),
-        md("## 5. Train the verifier (M2)"),
-        code("!python -m ml.verifier.train_verifier --train ml/data/out/verifier_train.jsonl "
-             "--dev ml/data/out/verifier_dev.jsonl --out models/verifier-v1 --epochs 2"),
-        md("## 6. Verifier evaluation on held-out RAGTruth test claims"),
-        code("!python -m ml.verifier.evaluate --model models/verifier-v1"),
-        md("## 7. Package results and models for download"),
-        code("import shutil\n"
-             "shutil.copy('ml/data/out/retrieval_results.md', '/kaggle/working/')\n"
-             "shutil.copy('ml/data/out/retrieval_results.json', '/kaggle/working/')\n"
-             "shutil.copy('ml/data/out/verifier_results.md', '/kaggle/working/')\n"
-             "shutil.copy('ml/data/out/verifier_results.json', '/kaggle/working/')\n"
-             "shutil.make_archive('/kaggle/working/collabmind_models', 'zip', 'models')\n"
-             "print(open('/kaggle/working/retrieval_results.md').read())\n"
-             "print(open('/kaggle/working/verifier_results.md').read())"),
+           "`BAAI/bge-small-en-v1.5` (MIT), BEIR SciFact, RAGTruth, MNLI."),
+        code(single_cell()),
     ]
     return {"cells": cells, "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                                          "language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}
@@ -124,10 +92,10 @@ ok = sh("m2-data", "python -m ml.verifier.make_data --mnli-rows 6000")
 tuned = ok and sh("m2-train", "python -m ml.verifier.train_verifier --train ml/data/out/verifier_train.jsonl "
                   "--dev ml/data/out/verifier_dev.jsonl --out models/verifier-v1 --epochs 2")
 if ok:
-    sh("m2-eval", "python -m ml.verifier.evaluate" + (" --model models/verifier-v1" if tuned else ""))
+    sh("m2-eval", "python -m ml.verifier.evaluate --save-scores ml/data/out/verifier_scores.json" + (" --model models/verifier-v1" if tuned else ""))
 
 # ---- package ------------------------------------------------------------------------------------
-for f in ("retrieval_results.md", "retrieval_results.json", "verifier_results.md", "verifier_results.json"):
+for f in ("retrieval_results.md", "retrieval_results.json", "retrieval_per_query_ndcg10.json", "verifier_results.md", "verifier_results.json", "verifier_scores.json"):
     if Path("ml/data/out", f).exists():
         shutil.copy(Path("ml/data/out", f), "/kaggle/working/" + f)
 if Path("models").exists():

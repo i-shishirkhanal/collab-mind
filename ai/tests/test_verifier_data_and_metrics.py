@@ -46,3 +46,25 @@ def test_bm25_ranks_the_matching_document_first():
                 "c": "mitochondria produce energy for the cell"})
     assert idx.search("how does photosynthesis use light")[0][0] == "a"
     assert idx.search("zzzz") == []
+
+
+def test_bootstrap_ci_brackets_the_mean_and_paired_test_detects_a_real_gap():
+    from ml.eval import stats
+
+    vals = [0.0, 1.0] * 50
+    mean, lo, hi = stats.bootstrap_ci(vals, n_boot=500)
+    assert lo < mean < hi and mean == pytest.approx(0.5)
+    base = [0.5] * 100
+    better = [0.6] * 100
+    sig = stats.paired_bootstrap(better, base, n_boot=500)
+    assert sig["lo"] > 0 and sig["p"] < 0.05
+    same = stats.paired_bootstrap([0.5, 0.7] * 50, [0.7, 0.5] * 50, n_boot=500)
+    assert same["lo"] < 0 < same["hi"] and same["p"] > 0.05
+
+
+def test_bootstrap_stat_ci_for_a_custom_statistic():
+    from ml.eval import stats
+
+    labels = [1] * 30 + [0] * 70
+    value, lo, hi = stats.bootstrap_stat_ci(100, lambda idx: sum(labels[i] for i in idx) / len(idx), n_boot=300)
+    assert value == pytest.approx(0.3) and lo < 0.3 < hi
