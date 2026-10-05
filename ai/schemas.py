@@ -95,6 +95,20 @@ class UsageInfo(BaseModel):
     reasoning_tokens: Optional[int] = None
 
 
+class UnsupportedClaim(BaseModel):
+    text: str
+    supported_probability: float
+    cited: list[int] = []
+
+
+class Faithfulness(BaseModel):
+    """Claim-level check of the answer against its sources (rag/verifier.py). Absent unless enabled."""
+    score: float  # share of checked claims judged supported, 0..1
+    claims_checked: int
+    unsupported: list[UnsupportedClaim] = []
+    latency_ms: int = 0
+
+
 class ChatResponse(BaseModel):
     answer: str
     citations: list[Citation]
@@ -104,6 +118,7 @@ class ChatResponse(BaseModel):
     task: Optional[str] = None
     route: Optional[RouteInfo] = None  # None when no model was called
     usage: Optional[UsageInfo] = None
+    faithfulness: Optional[Faithfulness] = None
 
 
 # ── Agent endpoints (Study Coach) ─────────────────────────────────────────────
@@ -118,11 +133,27 @@ class StudyCoachResponse(BaseModel):
     run_id: str
 
 
+class AgentRunRequest(BaseModel):
+    workspace_id: Id
+    user_id: Id
+    agent: Annotated[str, Field(min_length=1, max_length=40)]
+    goal: Annotated[str, Field(min_length=1, max_length=2000)]
+
+
 class AgentStatusResponse(BaseModel):
     run_id: str
     status: str
     plan: Optional[str] = None
     materials: Optional[str] = None
+    # Specialist agents (agents/engine.py)
+    agent_type: Optional[str] = None
+    goal: Optional[str] = None
+    step_count: int = 0
+    answer: Optional[str] = None
+    citations: list[Citation] = []
+    warnings: list[str] = []
+    message: Optional[str] = None
+    pending_approval: Optional[str] = None
 
 
 # ── Studio endpoints (Content Generation) ─────────────────────────────────────
@@ -183,3 +214,20 @@ class ReportRequest(BaseModel):
 
 class ReportResponse(BaseModel):
     report_markdown: str
+
+
+class WhiteboardRequest(BaseModel):
+    workspace_id: Id
+    user_id: Optional[Id] = None  # usage accounting only; set by the backend
+    topic: ShortText
+    max_nodes: Annotated[int, Field(ge=4, le=40)] = 20
+
+class WhiteboardNode(BaseModel):
+    id: str
+    label: str
+    parent: Optional[str] = None  # None only for the single root
+    source_ref: str = ""
+
+class WhiteboardResponse(BaseModel):
+    title: str
+    nodes: list[WhiteboardNode]

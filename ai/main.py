@@ -26,13 +26,14 @@ from db import get_pool, close_pool, ensure_schema
 from schemas import (
     EmbedRequest, EmbedResponse,
     SummarizeRequest, SummarizeResponse,
-    ChatRequest, GeneralChatRequest, ChatResponse, RouteInfo, UsageInfo,
+    ChatRequest, GeneralChatRequest, ChatResponse, RouteInfo, UsageInfo, Faithfulness, UnsupportedClaim,
     StudyCoachRequest, StudyCoachResponse,
-    AgentStatusResponse,
+    AgentRunRequest, AgentStatusResponse,
     FlashcardRequest, FlashcardsResponse,
     QuizRequest, QuizResponse,
     StudyGuideRequest, StudyGuideResponse,
     ReportRequest, ReportResponse,
+    WhiteboardRequest, WhiteboardResponse,
 )
 from rag.embedder import embed_source
 from rag.pipeline import RagResult, run_rag_pipeline, stream_rag_pipeline
@@ -42,6 +43,8 @@ from llm import get_router
 from agents.study_coach import StudyCoachAgent
 from agents.reaper import reaper_loop
 from agents.runner import run_study_coach_background
+from agents.engine import RunContext, run_agent
+from agents.registry import AGENTS
 
 log = logging.getLogger("collabmind.ai")
 
@@ -138,6 +141,12 @@ def _to_response(result: RagResult) -> ChatResponse:
         task=result.task.value if result.task else None,
         route=RouteInfo(**result.route.to_dict()) if result.route else None,
         usage=UsageInfo(**result.usage.to_dict()) if result.usage else None,
+        faithfulness=(Faithfulness(
+            score=result.faithfulness.score, claims_checked=result.faithfulness.claims_checked,
+            latency_ms=result.faithfulness.latency_ms,
+            unsupported=[UnsupportedClaim(text=v.text, supported_probability=round(v.supported_probability, 4),
+                                          cited=v.cited) for v in result.faithfulness.unsupported],
+        ) if result.faithfulness else None),
     )
 
 
@@ -274,12 +283,46 @@ async def approve_study_plan(run_id: str) -> dict:
     return {"ok": True, "message": f"Approved run {run_id}. Graph resuming..."}
 
 
+@app.post("/agents/run", response_model=StudyCoachResponse, summary="Start a specialist agent run")
+async def run_specialist_agent(body: AgentRunRequest, background_tasks: BackgroundTasks) -> StudyCoachResponse:
+    spec = AGENTS.get(body.agent)
+    if spec is None:
+        raise HTTPException(status_code=404, detail="Unknown agent.")
+    pool = await get_pool()
+    run_id = str(uuid.uuid4())
+    async with pool.acquire() as conn:
+        # One live run per workspace and agent: each run is several model calls.
+        busy = await conn.fetchval(
+            "SELECT 1 FROM agent_runs WHERE workspace_id = $1 AND agent_type = $2 "
+            "AND status NOT IN ('completed', 'failed', 'rejected') "
+            "AND created_at > NOW() - make_interval(mins => 30) LIMIT 1",
+            body.workspace_id, spec.key,
+        )
+        if busy:
+            raise HTTPException(status_code=409, detail=f"A {spec.title} run is already in progress in this workspace.")
+        await conn.execute(
+            "INSERT INTO agent_runs (id, workspace_id, user_id, agent_type, status, goal, result) "
+            "VALUES ($1, $2, $3, $4, 'running', $5, '{}')",
+            run_id, body.workspace_id, body.user_id, spec.key, body.goal,
+        )
+    ctx = RunContext(pool=pool, workspace_id=body.workspace_id, user_id=body.user_id, run_id=run_id)
+    background_tasks.add_task(run_agent, spec, ctx, body.goal)
+    return StudyCoachResponse(run_id=run_id)
+
+
+@app.post("/agents/{run_id}/reject", summary="Decline an agent's approval checkpoint")
+async def reject_agent_plan(run_id: str) -> dict:
+    redis_client = await get_redis()
+    await redis_client.set(f"rejected:{run_id}", "1", ex=300)
+    return {"ok": True}
+
+
 @app.get("/agents/{run_id}/status", response_model=AgentStatusResponse)
 async def get_agent_status(run_id: str) -> AgentStatusResponse:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT status, result FROM agent_runs WHERE id = $1",
+            "SELECT status, result, agent_type, goal, step_count FROM agent_runs WHERE id = $1",
             run_id
         )
 
@@ -296,6 +339,14 @@ async def get_agent_status(run_id: str) -> AgentStatusResponse:
         status=row["status"],
         plan=result_dict.get("plan"),
         materials=result_dict.get("materials"),
+        agent_type=row["agent_type"],
+        goal=row["goal"],
+        step_count=row["step_count"] or 0,
+        answer=result_dict.get("answer"),
+        citations=result_dict.get("citations") or [],
+        warnings=result_dict.get("warnings") or [],
+        message=result_dict.get("message"),
+        pending_approval=result_dict.get("pending_approval"),
     )
 
 
@@ -312,6 +363,11 @@ async def create_quiz(body: QuizRequest) -> QuizResponse:
 @app.post("/studio/study-guide", response_model=StudyGuideResponse, summary="Generate study guide")
 async def create_study_guide(body: StudyGuideRequest) -> StudyGuideResponse:
     return await generator.generate_study_guide(await get_pool(), body)
+
+
+@app.post("/studio/whiteboard", response_model=WhiteboardResponse, summary="Generate a mind map for the whiteboard")
+async def create_whiteboard(body: WhiteboardRequest) -> WhiteboardResponse:
+    return await generator.generate_whiteboard(await get_pool(), body)
 
 
 @app.post("/studio/report", response_model=ReportResponse, summary="Generate markdown report")

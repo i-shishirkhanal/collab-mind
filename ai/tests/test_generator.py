@@ -156,3 +156,29 @@ def test_json_with_trailing_garbage_or_leading_prose_takes_the_first_object():
         gen._parse_json('{"unterminated": ')
     with pytest.raises(errors.MalformedResponseError):
         gen._parse_json("no json here")
+
+
+def test_whiteboard_keeps_one_grounded_tree_and_drops_unsupported_branches(setup):
+    from schemas import WhiteboardRequest
+    setup(ok({"title": "Photosynthesis", "nodes": [
+        {"id": "a", "label": "Photosynthesis", "parent": None, "source_ref": "biology.pdf"},
+        {"id": "b", "label": "Light reactions", "parent": "a", "source_ref": "BIOLOGY.PDF, p.3"},
+        {"id": "c", "label": "Invented claim", "parent": "a", "source_ref": "made-up-book.pdf"},
+        {"id": "d", "label": "Child of invented", "parent": "c", "source_ref": "biology.pdf"},
+        {"id": "e", "label": "ATP", "parent": "b", "source_ref": "cells.docx"},
+        {"id": "f", "label": "Orphan", "parent": "zzz", "source_ref": "biology.pdf"},
+        {"id": "g", "label": "Second root", "parent": None, "source_ref": "biology.pdf"},
+    ]}))
+    r = run(gen.generate_whiteboard(None, WhiteboardRequest(workspace_id="ws", topic="light")))
+    assert [n.id for n in r.nodes] == ["a", "b", "e"]
+    assert [n.source_ref for n in r.nodes] == ["biology.pdf", "biology.pdf", "cells.docx"]
+
+
+def test_whiteboard_with_nothing_grounded_is_refused(setup):
+    from schemas import WhiteboardRequest
+    setup(ok({"title": "t", "nodes": [
+        {"id": "a", "label": "Root", "parent": None, "source_ref": "x"},
+        {"id": "b", "label": "Made up", "parent": "a", "source_ref": "nope.pdf"},
+    ]}))
+    with pytest.raises(gen.NoRelevantSourcesError):
+        run(gen.generate_whiteboard(None, WhiteboardRequest(workspace_id="ws", topic="light")))

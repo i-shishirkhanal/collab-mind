@@ -175,8 +175,16 @@ export const approveAgent = (workspaceId: string, runId: string) =>
 export const getAgentStatus = (workspaceId: string, runId: string) => 
   apiCall(`/api/workspaces/${workspaceId}/agents/${runId}/status`);
 
-export const getLatestAgentRun = (workspaceId: string) =>
-  apiCall(`/api/workspaces/${workspaceId}/agents/latest`);
+export const getLatestAgentRun = (workspaceId: string, agent?: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/agents/latest${agent ? `?agent=${encodeURIComponent(agent)}` : ''}`);
+
+// Specialist agents (research, literature_review, debate, report_builder)
+export const runAgent = (workspaceId: string, agent: string, goal: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/agents/run`, { method: 'POST', body: JSON.stringify({ agent, goal }) });
+export const rejectAgent = (workspaceId: string, runId: string) =>
+  apiCall(`/api/workspaces/${workspaceId}/agents/${runId}/reject`, { method: 'POST' });
+export const getAgentSteps = (workspaceId: string, runId: string, after = 0) =>
+  apiCall(`/api/workspaces/${workspaceId}/agents/${runId}/steps?after=${after}`);
 
 export type StudioKind = 'flashcards' | 'quiz' | 'guide' | 'report';
 /** The most recent saved result for a Studio tool: { output: { params, content, created_at } | null }. */
@@ -191,6 +199,10 @@ export const generateStudyGuide = (workspaceId: string, topic: string) =>
   apiCall(`/api/workspaces/${workspaceId}/studio/guide`, { method: 'POST', body: JSON.stringify({ topic }) });
 export const generateReport = (workspaceId: string, title: string, outlinePoints: string[]) => 
   apiCall(`/api/workspaces/${workspaceId}/studio/report`, { method: 'POST', body: JSON.stringify({ title, outline_points: outlinePoints }) });
+
+export interface MindMapNode { id: string; label: string; parent: string | null; source_ref: string }
+export const generateWhiteboard = (workspaceId: string, topic: string, maxNodes = 20): Promise<{ title: string; nodes: MindMapNode[] }> =>
+  apiCall(`/api/workspaces/${workspaceId}/whiteboard/generate`, { method: 'POST', body: JSON.stringify({ topic, maxNodes }) });
 
 // Account API
 export const changePassword = (currentPassword: string, newPassword: string) =>

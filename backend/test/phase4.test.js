@@ -89,12 +89,20 @@ test('routes that call the LLM or ingest documents are behind a per-user limiter
   const read = (p) => fs.readFileSync(src(p), 'utf8');
   assert.match(read('routes/chat.js'), /chatLimit,\s*\n\s*requireWorkspaceMember,\s*\n\s*chatController\.sendMessage/);
   const agents = read('routes/agents.js');
-  for (const r of ["agents/study-coach'", "studio/flashcards'", "studio/quiz'", "studio/guide'", "studio/report'"]) {
+  for (const r of ["agents/study-coach'", "agents/run'", "studio/flashcards'", "studio/quiz'", "studio/guide'", "studio/report'"]) {
     assert.match(agents, new RegExp(`${r.replace('/', '\\/')}, \\.\\.\\.costlyGuard`), r);
   }
   const sources = read('routes/sources.js');
   for (const frag of ['sources/upload\', authenticate, ingestLimit', 'sources/url\', authenticate, ingestLimit', 'summarize\', authenticate, summarizeLimit', 'retry\', authenticate, ingestLimit']) assert.ok(sources.includes(frag), frag);
   assert.ok(read('socket/handlers.js').includes("consume('chat'"), 'socket chat shares the budget');
+});
+
+test('only an owner or admin can approve or reject an agent run; any member can start one', () => {
+  const { can } = require('../src/services/workspaceAccess');
+  assert.equal(can('member', 'agents:run'), true);
+  assert.equal(can('member', 'agents:approve'), false);
+  assert.equal(can('admin', 'agents:approve'), true);
+  assert.equal(can('owner', 'agents:approve'), true);
 });
 
 // ── deleting a workspace must also remove its uploaded files ───────────────────────────────────

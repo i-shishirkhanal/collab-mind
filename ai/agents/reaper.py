@@ -26,7 +26,7 @@ async def reap_stuck_runs(pool: asyncpg.Pool, max_age_minutes: int = MAX_RUN_AGE
             """
             UPDATE agent_runs
                SET status = 'failed', finished_at = NOW()
-             WHERE status NOT IN ('completed', 'failed')
+             WHERE status NOT IN ('completed', 'failed', 'rejected')
                AND created_at < NOW() - make_interval(mins => $1)
          RETURNING id, workspace_id
             """,

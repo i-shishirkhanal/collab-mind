@@ -3,7 +3,7 @@
 import { useChatStore } from "@/lib/store";
 import { ChatMessage as ChatMessageType } from "@/types";
 import React, { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ShieldAlert, ShieldCheck } from "lucide-react";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -19,6 +19,7 @@ export function ChatMessage({ message, precedingQuestion, onAskGeneral }: ChatMe
   const citations = message.metadata?.citations ?? message.citations ?? [];
   const grounding = message.metadata?.grounding ?? null;
   const warnings = message.metadata?.warnings ?? [];
+  const faithfulness = message.metadata?.faithfulness ?? null;
   const setActiveCitation = useChatStore(s => s.setActiveCitation);
   const isUngrounded = !isUser && (
     grounding === 'no_sources' || grounding === 'no_answer' || message.content.trim() === NOT_FOUND_MESSAGE
@@ -28,6 +29,7 @@ export function ChatMessage({ message, precedingQuestion, onAskGeneral }: ChatMe
   const isGeneral = message.metadata?.mode === 'general' || grounding === 'general';
 
   const [showSources, setShowSources] = useState(false);
+  const [showUnsupported, setShowUnsupported] = useState(false);
 
   // Citations stay attached to the message but are not shown inline: the [n] markers the model
   // writes are stripped from the text, and the eye button below reveals what they pointed at.
@@ -87,6 +89,39 @@ export function ChatMessage({ message, precedingQuestion, onAskGeneral }: ChatMe
 
           {!isUser && warnings.length > 0 && !isUncited && (
             <div className="mt-2 text-[11px] text-amber-400/80 not-italic">{warnings.join(' ')}</div>
+          )}
+
+          {!isUser && !isUngrounded && faithfulness && faithfulness.claims_checked > 0 && (
+            <div className="mt-2.5 pt-2.5 border-t border-slate-700/50 not-italic">
+              <button
+                type="button"
+                onClick={() => setShowUnsupported(v => !v)}
+                disabled={faithfulness.unsupported.length === 0}
+                aria-expanded={showUnsupported}
+                title="How many statements in this answer are backed by the cited sources, checked by a model trained for this. It can be wrong, so treat it as a hint."
+                className={`flex items-center gap-1.5 text-[11px] font-medium transition-colors ${
+                  faithfulness.unsupported.length === 0
+                    ? "text-emerald-400/90 cursor-default"
+                    : faithfulness.score >= 0.6 ? "text-amber-400/90 hover:text-amber-300" : "text-rose-400/90 hover:text-rose-300"
+                }`}
+              >
+                {faithfulness.unsupported.length === 0
+                  ? <ShieldCheck className="w-3.5 h-3.5" />
+                  : <ShieldAlert className="w-3.5 h-3.5" />}
+                {faithfulness.unsupported.length === 0
+                  ? `All ${faithfulness.claims_checked} statements match your sources`
+                  : `${faithfulness.unsupported.length} of ${faithfulness.claims_checked} statements may not be backed by your sources`}
+              </button>
+              {showUnsupported && faithfulness.unsupported.length > 0 && (
+                <ul className="mt-2 space-y-1.5">
+                  {faithfulness.unsupported.map((u, i) => (
+                    <li key={`${i}-${u.text.slice(0, 24)}`} className="rounded-lg bg-slate-900/60 border border-amber-500/20 px-3 py-2 text-xs text-slate-300">
+                      {u.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {!isUser && !isUngrounded && citations.length > 0 && (

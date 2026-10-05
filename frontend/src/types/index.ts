@@ -97,6 +97,21 @@ export interface ChatMessageMetadata {
   task?: 'chat' | 'study' | 'research' | null;
   model?: { provider: string; tier: 'flash' | 'pro'; model_used: string; fallback_used: boolean } | null;
   usage?: { total_tokens?: number | null } | null;
+  // Claim-level check of the answer against its cited sources; absent unless the verifier is switched on.
+  faithfulness?: Faithfulness | null;
+}
+
+export interface UnsupportedClaim {
+  text: string;
+  supported_probability: number;
+  cited?: number[];
+}
+
+export interface Faithfulness {
+  score: number;            // share of checked claims judged supported, 0..1
+  claims_checked: number;
+  unsupported: UnsupportedClaim[];
+  latency_ms?: number;
 }
 
 export interface AgentRun {
@@ -126,4 +141,26 @@ export interface StudySection {
   heading: string;
   content: string;
   key_terms: string[];
+}
+
+export interface AgentStep {
+  id: number;
+  step_no: number;
+  kind: 'thought' | 'tool_call' | 'observation' | 'approval' | 'final' | 'error';
+  tool_name: string | null;
+  content: string;
+  created_at: string;
+}
+
+export interface AgentRunStatus {
+  run_id: string;
+  status: 'running' | 'awaiting_approval' | 'completed' | 'failed' | 'rejected' | string;
+  agent_type?: string | null;
+  goal?: string | null;
+  step_count?: number;
+  answer?: string | null;
+  citations?: Citation[];
+  warnings?: string[];
+  message?: string | null;
+  pending_approval?: string | null;
 }

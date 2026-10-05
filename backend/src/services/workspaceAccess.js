@@ -24,6 +24,7 @@ const PERMISSIONS = {
   'chat:read':        'member',
   'chat:write':       'member',
   'agents:run':       'member',
+  'agents:approve':   'admin',
   'studio:generate':  'member',
   'whiteboard:read':  'member',
   'whiteboard:write': 'member',

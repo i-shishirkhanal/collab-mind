@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Circle, Download, Eraser, Minus, Pencil, Redo2, Square, Trash2, Type, Undo2, Users } from "lucide-react";
+import { Circle, Download, Eraser, Loader2, Minus, Pencil, Redo2, Sparkles, Square, Trash2, Type, Undo2, Users } from "lucide-react";
 import { useSocketContext } from "@/hooks/SocketProvider";
+import { generateWhiteboard } from "@/lib/api";
+import { planMindMap } from "@/lib/mindMapLayout";
 
 type Tool = "pen" | "eraser" | "line" | "rect" | "ellipse" | "text";
 type Point = [number, number];
@@ -88,6 +90,12 @@ export function Whiteboard({ workspaceId }: { workspaceId: string }) {
   const [size, setSize] = useState(4);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSources, setAiSources] = useState<string[]>([]);
+  const aiStrokeIds = useRef<string[]>([]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -220,6 +228,41 @@ export function Whiteboard({ workspaceId }: { workspaceId: string }) {
     render();
   };
 
+  // Ask the workspace sources for a mind map, then draw it with the same strokes a person would.
+  const generateMap = async () => {
+    const topic = aiTopic.trim();
+    if (!topic || aiBusy) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const { title, nodes } = await generateWhiteboard(workspaceId, topic);
+      const planned = planMindMap(title, nodes, BOARD_W, BOARD_H);
+      if (!planned.length) throw new Error("The AI returned nothing to draw");
+      const ids: string[] = [];
+      for (const p of planned) {
+        const id = newId();
+        ids.push(id);
+        commit({ id, userId: myId, tool: p.tool, color: p.color, size: p.size, points: p.points, text: p.text });
+      }
+      aiStrokeIds.current = ids;
+      setAiSources([...new Set(nodes.map((n) => n.source_ref).filter(Boolean))]);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "Could not generate a mind map");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const undoAiMap = () => {
+    const ids = new Set(aiStrokeIds.current);
+    if (!ids.size) return;
+    strokesRef.current = strokesRef.current.filter((s) => !ids.has(s.id));
+    ids.forEach((id) => socket?.emit("whiteboard:remove", { id }));
+    aiStrokeIds.current = [];
+    setAiSources([]);
+    render();
+  };
+
   const download = () => {
     const url = canvasRef.current?.toDataURL("image/png");
     if (!url) return;
@@ -274,6 +317,13 @@ export function Whiteboard({ workspaceId }: { workspaceId: string }) {
         <button title="Redo" onClick={redo} className={`${btn} text-slate-500 hover:bg-slate-100`}>
           <Redo2 className="w-4 h-4" />
         </button>
+        <button
+          title="AI mind map from your sources"
+          onClick={() => setAiOpen((o) => !o)}
+          className={`${btn} ${aiOpen ? "bg-indigo-600 text-white" : "text-indigo-500 hover:bg-indigo-50"}`}
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
         <button title="Download PNG" onClick={download} className={`${btn} text-slate-500 hover:bg-slate-100`}>
           <Download className="w-4 h-4" />
         </button>
@@ -285,6 +335,44 @@ export function Whiteboard({ workspaceId }: { workspaceId: string }) {
           {loaded ? "Live — shared with your group" : "Connecting…"}
         </span>
       </div>
+
+      {aiOpen && (
+        <div className="flex flex-col gap-1 bg-white rounded-2xl px-3 py-2 shadow">
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void generateMap();
+            }}
+          >
+            <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
+            <input
+              value={aiTopic}
+              onChange={(e) => setAiTopic(e.target.value)}
+              maxLength={500}
+              placeholder="Mind map of… (built only from your workspace sources)"
+              className="flex-1 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
+            />
+            <button
+              type="submit"
+              disabled={aiBusy || !aiTopic.trim()}
+              className="text-xs font-medium px-3 py-1.5 rounded-full bg-indigo-600 text-white disabled:opacity-50 flex items-center gap-1"
+            >
+              {aiBusy && <Loader2 className="w-3 h-3 animate-spin" />}
+              {aiBusy ? "Drawing…" : "Generate"}
+            </button>
+            {aiStrokeIds.current.length > 0 && (
+              <button type="button" onClick={undoAiMap} className="text-xs text-slate-500 hover:text-red-500">
+                Undo AI map
+              </button>
+            )}
+          </form>
+          {aiError && <div className="text-xs text-red-500">{aiError}</div>}
+          {aiSources.length > 0 && (
+            <div className="text-xs text-slate-500">Sources used: {aiSources.join(", ")}</div>
+          )}
+        </div>
+      )}
 
       {notice && <div className="text-xs text-amber-400 px-2">{notice}</div>}
 

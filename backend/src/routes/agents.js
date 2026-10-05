@@ -5,6 +5,7 @@ const authenticate = require('../middleware/authenticate');
 const requireWorkspaceMember = require('../middleware/requireWorkspaceMember');
 const { requireUuidParams, httpError } = require('../utils/http');
 const { perUser } = require('../middleware/rateLimit');
+const { can } = require('../services/workspaceAccess');
 
 // Agent runs and studio generation are the most expensive calls (long prompts, Pro-capable): AI_TOOL_RATE_LIMIT_PER_MIN, default 10/min per user.
 const toolLimit = perUser('ai-tool', 'AI_TOOL_RATE_LIMIT_PER_MIN', 10);
@@ -23,6 +24,14 @@ const relayError = (err, res, next) => {
     // Rate limit / not configured / timeout carry a safe, user-facing message from the AI service.
     if ([429, 503, 504].includes(status) && typeof detail === 'string') {
       return res.status(status).json({ error: detail });
+    }
+    // "A run is already in progress" carries a fixed, safe message from the AI service.
+    if (status === 409 && typeof detail === 'string') {
+      return res.status(409).json({ error: detail });
+    }
+    // "Nothing relevant in your sources" is a normal outcome with a fixed, safe message.
+    if (status === 404 && err.response.data && err.response.data.code === 'no_relevant_sources') {
+      return res.status(404).json({ error: detail });
     }
     // A 401/403 here is OUR credential problem, never the end user's: hide it as a 502.
     return res.status(status >= 500 || status === 401 || status === 403 ? 502 : status)
@@ -70,6 +79,7 @@ router.post('/:workspaceId/agents/study-coach', ...costlyGuard, async (req, res,
  */
 router.post('/:workspaceId/agents/:runId/approve', ...guardRun, assertRunInWorkspace, async (req, res, next) => {
   try {
+    if (!can(req.membership.role, 'agents:approve')) throw httpError(403, 'Only an owner or admin can approve an agent run');
     // Approval only counts while the run is actually waiting for it; a pre-approval would
     // skip the human review step.
     const { rows } = await pool.query('SELECT status FROM agent_runs WHERE id = $1 AND workspace_id = $2',
@@ -93,6 +103,69 @@ router.get('/:workspaceId/agents/:runId/status', ...guardRun, assertRunInWorkspa
     res.json(response.data);
   } catch (err) {
     relayError(err, res, next);
+  }
+});
+
+/**
+ * POST /api/workspaces/:workspaceId/agents/:runId/reject
+ * Declines an agent's approval checkpoint; the run stops.
+ */
+router.post('/:workspaceId/agents/:runId/reject', ...guardRun, assertRunInWorkspace, async (req, res, next) => {
+  try {
+    if (!can(req.membership.role, 'agents:approve')) throw httpError(403, 'Only an owner or admin can reject an agent run');
+    const { rows } = await pool.query('SELECT status FROM agent_runs WHERE id = $1 AND workspace_id = $2',
+      [req.params.runId, req.params.workspaceId]);
+    if (!rows[0] || rows[0].status !== 'awaiting_approval') {
+      throw httpError(409, 'This run is not waiting for approval');
+    }
+    const response = await aiClient.post(`/agents/${req.params.runId}/reject`, {});
+    res.json(response.data);
+  } catch (err) {
+    relayError(err, res, next);
+  }
+});
+
+// Specialist agents (ai/agents/registry.py is the authority; this list only rejects typos early).
+const SPECIALIST_AGENTS = ['research', 'literature_review', 'debate', 'report_builder'];
+
+/**
+ * POST /api/workspaces/:workspaceId/agents/run   { agent, goal }
+ */
+router.post('/:workspaceId/agents/run', ...costlyGuard, async (req, res, next) => {
+  try {
+    if (!can(req.membership.role, 'agents:run')) throw httpError(403, 'You do not have permission to do that');
+    const { agent, goal } = req.body || {};
+    if (!SPECIALIST_AGENTS.includes(agent)) throw httpError(400, 'Unknown agent');
+    if (typeof goal !== 'string' || !goal.trim() || goal.length > 2000) {
+      throw httpError(400, 'goal is required (max 2000 characters)');
+    }
+    const response = await aiClient.post('/agents/run', {
+      workspace_id: req.params.workspaceId,
+      user_id: req.user.id,
+      agent,
+      goal: goal.trim(),
+    });
+    res.json(response.data);
+  } catch (err) {
+    relayError(err, res, next);
+  }
+});
+
+/**
+ * GET /api/workspaces/:workspaceId/agents/:runId/steps?after=<id>
+ * The run log: every thought, tool call, result and approval, readable by every workspace member.
+ */
+router.get('/:workspaceId/agents/:runId/steps', ...guardRun, assertRunInWorkspace, async (req, res, next) => {
+  try {
+    const after = Math.max(parseInt(req.query.after, 10) || 0, 0);
+    const { rows } = await pool.query(
+      `SELECT id, step_no, kind, tool_name, content, created_at FROM agent_steps
+        WHERE run_id = $1 AND id > $2 ORDER BY id LIMIT 200`,
+      [req.params.runId, after],
+    );
+    res.json({ steps: rows });
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -145,6 +218,31 @@ router.post('/:workspaceId/studio/guide', ...costlyGuard, proxyStudio('study-gui
 router.post('/:workspaceId/studio/report', ...costlyGuard, proxyStudio('report', 'report'));
 
 /**
+ * POST /api/workspaces/:workspaceId/whiteboard/generate
+ * Returns a source-grounded mind map outline; the browser lays it out and draws it through the
+ * normal whiteboard socket events. Not saved: the board itself is the record.
+ */
+router.post('/:workspaceId/whiteboard/generate', ...costlyGuard, async (req, res, next) => {
+  try {
+    if (!can(req.membership.role, 'whiteboard:write')) throw httpError(403, 'You do not have permission to do that');
+    const topic = req.body && req.body.topic;
+    if (typeof topic !== 'string' || !topic.trim() || topic.length > 500) {
+      throw httpError(400, 'topic is required (max 500 characters)');
+    }
+    const maxNodes = Math.min(Math.max(parseInt(req.body.maxNodes, 10) || 20, 4), 40);
+    const response = await aiClient.post('/studio/whiteboard', {
+      workspace_id: req.params.workspaceId,
+      user_id: req.user.id,
+      topic: topic.trim(),
+      max_nodes: maxNodes,
+    }, { timeout: 120_000 });
+    res.json(response.data);
+  } catch (err) {
+    relayError(err, res, next);
+  }
+});
+
+/**
  * GET /api/workspaces/:workspaceId/studio/:kind/latest
  * The most recent saved result for a tool, or { output: null } when there is none.
  */
@@ -169,10 +267,12 @@ router.get('/:workspaceId/studio/:kind/latest', ...guard, async (req, res, next)
  */
 router.get('/:workspaceId/agents/latest', ...guard, async (req, res, next) => {
   try {
+    const agent = req.query.agent === undefined ? 'study_coach' : req.query.agent;
+    if (agent !== 'study_coach' && !SPECIALIST_AGENTS.includes(agent)) throw httpError(400, 'Unknown agent');
     const { rows } = await pool.query(
-      `SELECT id FROM agent_runs WHERE workspace_id = $1 AND agent_type = 'study_coach'
+      `SELECT id FROM agent_runs WHERE workspace_id = $1 AND agent_type = $2
         ORDER BY created_at DESC LIMIT 1`,
-      [req.params.workspaceId],
+      [req.params.workspaceId, agent],
     );
     res.json({ run_id: rows[0] ? rows[0].id : null });
   } catch (err) {

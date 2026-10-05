@@ -6,9 +6,21 @@ import { QuizTool } from "@/components/studio/QuizTool";
 import { StudyGuideTool } from "@/components/studio/StudyGuideTool";
 import { ReportTool } from "@/components/studio/ReportTool";
 import { AgentTool } from "@/components/studio/AgentTool";
-import { CopySlash, HelpCircle, BookOpen, FileSignature, Zap } from "lucide-react";
+import { AgentRunPanel, type AgentDef } from "@/components/studio/AgentRunPanel";
+import { CopySlash, HelpCircle, BookOpen, FileSignature, Zap, Search, Library, Scale, FileText } from "lucide-react";
 
-type ToolType = "flashcards" | "quiz" | "guide" | "report" | "agent";
+const SPECIALISTS: AgentDef[] = [
+  { key: "research", title: "Research Agent", subtitle: "Investigates a question across your sources", icon: Search,
+    placeholder: "e.g. What do our sources say about transformer scaling limits?", button: "Run research" },
+  { key: "literature_review", title: "Literature Review Agent", subtitle: "Themes and gaps, with owner approval first", icon: Library,
+    placeholder: "e.g. Review the literature on spaced repetition", button: "Start review" },
+  { key: "debate", title: "Debate Agent", subtitle: "Pro/con synthesis and comparison tables", icon: Scale,
+    placeholder: "e.g. Is remote learning as effective as classroom learning?", button: "Start debate" },
+  { key: "report_builder", title: "Report Builder Agent", subtitle: "Outline approval, then a cited report", icon: FileText,
+    placeholder: "e.g. A report on the main findings across our sources", button: "Build report" },
+];
+
+type ToolType = "flashcards" | "quiz" | "guide" | "report" | "agent" | string;
 
 export default function StudioPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -21,6 +33,7 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
     { id: "guide", label: "Study Guide", icon: BookOpen, desc: "Generate a markdown guide" },
     { id: "report", label: "AI Report Draft", icon: FileSignature, desc: "Exportable markdown report" },
     { id: "agent", label: "Study Coach Agent", icon: Zap, desc: "Autonomous learning planner" },
+    ...SPECIALISTS.map((a) => ({ id: a.key, label: a.title, icon: a.icon, desc: a.subtitle })),
   ];
 
   const renderTool = () => {
@@ -30,7 +43,10 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
       case "guide": return <StudyGuideTool workspaceId={id} />;
       case "report": return <ReportTool workspaceId={id} />;
       case "agent": return <AgentTool workspaceId={id} />;
-      default: return null;
+      default: {
+        const specialist = SPECIALISTS.find((a) => a.key === activeTool);
+        return specialist ? <AgentRunPanel key={specialist.key} workspaceId={id} agent={specialist} /> : null;
+      }
     }
   };
 

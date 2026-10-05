@@ -54,7 +54,7 @@ def test_reaper_fails_stuck_runs_and_notifies_the_workspace(monkeypatch):
     conn = _Conn(fetch_result=[{"id": run, "workspace_id": ws}])
 
     assert asyncio.run(reaper.reap_stuck_runs(_Pool(conn))) == 1
-    assert "status NOT IN ('completed', 'failed')" in conn.queries[0]
+    assert "status NOT IN ('completed', 'failed', 'rejected')" in conn.queries[0]
     assert published == [(str(ws), {"run_id": str(run), "status": "failed", "message": published[0][1]["message"]})]
 
 

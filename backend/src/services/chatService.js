@@ -100,6 +100,7 @@ const buildMetadata = (ai) => ({
   task: ai.task || null,
   model: ai.route || null,   // provider, tier, model_requested, model_used, fallback_used, attempts ...
   usage: ai.usage || null,   // token counts when the provider reports them
+  faithfulness: ai.faithfulness || null,   // claim-level check against the cited sources (null unless the AI service has it on)
 });
 
 /**

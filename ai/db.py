@@ -44,7 +44,8 @@ async def get_pool() -> asyncpg.Pool:
 _REQUIRED_COLUMNS = {
     "source_chunks": ("location_label", "embedding_model", "embedding_dim", "fts"),
     "sources": ("is_active",),
-    "agent_runs": ("finished_at",),
+    "agent_runs": ("finished_at", "goal", "step_count"),
+    "agent_steps": ("run_id", "step_no"),
     "llm_usage": ("workspace_id", "total_tokens"),
 }
 
