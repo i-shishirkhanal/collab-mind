@@ -94,21 +94,27 @@ def main() -> None:
 
     OUT.mkdir(parents=True, exist_ok=True)
     ref = results[0]["system"]                       # paired comparisons are against the first system (BM25)
+    first_rows = [r for r in results if "+rerank" not in r["system"]]
+    best = max(first_rows, key=lambda r: r["ndcg@10"])["system"]       # strongest system WITHOUT a reranker
     for r in results:
         d = paired_bootstrap(per_query[r["system"]], per_query[ref])
         r.update({"delta_vs_ref": d["diff"], "delta_lo": d["lo"], "delta_hi": d["hi"], "delta_p": d["p"]})
+        b = paired_bootstrap(per_query[r["system"]], per_query[best])
+        r.update({"delta_vs_best": b["diff"], "best_lo": b["lo"], "best_hi": b["hi"], "best_p": b["p"]})
     (OUT / "retrieval_results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     (OUT / "retrieval_per_query_ndcg10.json").write_text(json.dumps({"qids": qids, "ndcg@10": per_query}), encoding="utf-8")
     cols = ["recall@1", "recall@10", "mrr@10"]
-    head = ["system", *cols, "ndcg@10 [95% CI]", f"delta vs {ref} [95% CI]", "p", "latency_ms"]
+    head = ["system", *cols, "ndcg@10 [95% CI]", f"delta vs {ref} [95% CI]", "p", f"delta vs best no-reranker [95% CI]", "p ", "latency_ms"]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     for r in results:
         sig = "" if r["system"] == ref else f"{r['delta_vs_ref']:+.3f} [{r['delta_lo']:+.3f}, {r['delta_hi']:+.3f}]"
         pval = "" if r["system"] == ref else f"{r['delta_p']:.3f}"
+        sig_b = "" if r["system"] == best else f"{r['delta_vs_best']:+.3f} [{r['best_lo']:+.3f}, {r['best_hi']:+.3f}]"
+        pval_b = "" if r["system"] == best else f"{r['best_p']:.3f}"
         lines.append(f"| {r['system']} | " + " | ".join(f"{r[c]:.3f}" for c in cols)
-                     + f" | {r['ndcg@10']:.3f} [{r['ndcg_lo']:.3f}, {r['ndcg_hi']:.3f}] | {sig} | {pval} | {r['latency_ms']:.0f} |")
+                     + f" | {r['ndcg@10']:.3f} [{r['ndcg_lo']:.3f}, {r['ndcg_hi']:.3f}] | {sig} | {pval} | {sig_b} | {pval_b} | {r['latency_ms']:.0f} |")
     note = (f"Test queries: {len(qids)} (BEIR SciFact test). Intervals are 95% percentile bootstrap over queries; the delta "
-            "column is a paired bootstrap against the first row. A difference is only claimed when its interval excludes 0.")
+            f"column is a paired bootstrap against the first row; 'best no-reranker' is {best}. A difference is only claimed when its interval excludes 0.")
     (OUT / "retrieval_results.md").write_text("\n".join(lines) + "\n\n" + note + "\n", encoding="utf-8")
     print("\n" + "\n".join(lines) + "\n\n" + note)
 

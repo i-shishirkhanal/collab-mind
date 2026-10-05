@@ -31,6 +31,7 @@ FILES = [
     "ml/injection/__init__.py", "ml/injection/heuristic.py", "ml/injection/make_data.py",
     "ml/injection/train_injection.py", "ml/injection/evaluate.py",
     "ml/data/indomain/chunks.jsonl",       # benign study chunks (CC BY-SA Wikipedia) for the poisoned-chunk injection test
+    "ml/data/out/judge_preds.json",        # LLM-judge verdicts made locally (the API key never goes to Kaggle); optional
 ]
 
 
@@ -44,7 +45,6 @@ def code(text: str) -> dict:
 
 
 def build() -> dict:
-    files = {p: (ROOT / p).read_text(encoding="utf-8") for p in FILES}
     cells = [
         md("# CollabMind: reranker + claim verifier training\n"
            "Settings: **Accelerator = GPU T4 x2**, **Internet = On**. Then *Save Version -> Save & Run All* (runs unattended). "
@@ -99,7 +99,8 @@ ok = sh("m2-data", "python -m ml.verifier.make_data --mnli-rows 6000")
 tuned = ok and sh("m2-train", "python -m ml.verifier.train_verifier --train ml/data/out/verifier_train.jsonl "
                   "--dev ml/data/out/verifier_dev.jsonl --out models/verifier-v1 --epochs 2")
 if ok:
-    scored = sh("m2-eval", "python -m ml.verifier.evaluate --save-scores ml/data/out/verifier_scores.json" + (" --model models/verifier-v1" if tuned else ""))
+    judge = " --judge-preds ml/data/out/judge_preds.json" if Path("ml/data/out/judge_preds.json").exists() else ""
+    scored = sh("m2-eval", "python -m ml.verifier.evaluate --save-scores ml/data/out/verifier_scores.json" + judge + (" --model models/verifier-v1" if tuned else ""))
     if tuned and scored:
         sh("m3-calibration", "python -m ml.calibration.calibrate_verifier --scores ml/data/out/verifier_scores.json")
 
@@ -130,7 +131,7 @@ def single_cell() -> str:
     import base64
     import zlib
 
-    files = {p: (ROOT / p).read_text(encoding="utf-8") for p in FILES}
+    files = {p: (ROOT / p).read_text(encoding="utf-8") for p in FILES if (ROOT / p).exists()}
     blob = base64.b64encode(zlib.compress(json.dumps(files).encode("utf-8"), 9)).decode("ascii")
     return f'BLOB = "{blob}"\n' + SINGLE_CELL_RUNNER
 

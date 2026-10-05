@@ -2,13 +2,13 @@
 ml/verifier/evaluate.py — the verifier results table on the held-out RAGTruth test claims.
 
     python -m ml.verifier.evaluate --model models/verifier-v1                 # GPU/CPU with torch
-    python -m ml.verifier.evaluate --lexical-only --llm-sample 150            # no torch; spends <=150 LLM calls
+    python -m ml.verifier.evaluate --lexical-only --judge-preds ml/data/out/judge_preds.json   # no torch
 
 Task: flag UNSUPPORTED claims (hallucination detection), so "positive" = unsupported. Systems:
     lexical          share of the claim's content words found in the premise (no learning; the floor)
     nli-zero-shot    cross-encoder/nli-deberta-v3-small, P(entailment), NOT fine-tuned by us
     fine-tuned       our model (--model)
-    llm-judge        DeepSeek judging "is this claim supported by the passage" (--llm-sample N rows only)
+    llm-judge        DeepSeek judging "is this claim supported" on a fixed stratified subset (--judge-preds, from ml.verifier.judge)
 Thresholds are chosen on the DEV file (max F1) and applied unchanged to TEST. Reported: precision, recall, F1
 of the unsupported class, ROC-AUC, ECE of P(supported) (scored systems), latency per claim.
 Writes ml/data/out/verifier_results.{json,md}.
@@ -19,20 +19,15 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import random
-import re
 import time
 from pathlib import Path
 
 from ml.eval.classification import best_threshold, ece, prf, roc_auc
 from ml.eval.stats import bootstrap_stat_ci
+from ml.verifier.judge import claim_hash
 from ml.verifier.sentences import _terms
 
 OUT = Path(__file__).parent.parent / "data" / "out"
-JUDGE_SYSTEM = ("You check whether a CLAIM is fully supported by a PASSAGE. Answer with exactly one word: "
-                "SUPPORTED if the passage states or clearly implies the claim, otherwise UNSUPPORTED.")
-
-
 def read(name: str) -> list[dict]:
     return [json.loads(x) for x in (OUT / f"verifier_{name}.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
 
@@ -93,24 +88,12 @@ def threshold_from_dev(dev_rows: list[dict], dev_p: list[float]) -> float:
     return 1 - t
 
 
-def llm_judge(rows: list[dict]) -> tuple[list[int], float]:
-    from ml import llm
-
-    preds, t0 = [], time.perf_counter()
-    for r in rows:
-        ans = llm.chat(f"PASSAGE:\n{r['premise']}\n\nCLAIM:\n{r['hypothesis']}", system=JUDGE_SYSTEM, max_tokens=4, temperature=0)
-        preds.append(0 if re.match(r"\s*SUPPORTED", ans, re.I) else 1)       # 1 = flagged unsupported
-    return preds, 1000 * (time.perf_counter() - t0) / max(1, len(rows))
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="fine-tuned verifier path/id")
     ap.add_argument("--zero-shot", default="cross-encoder/nli-deberta-v3-small")
     ap.add_argument("--lexical-only", action="store_true", help="skip every neural model (no torch needed)")
-    ap.add_argument("--llm-sample", type=int, default=0, help="also run the LLM judge on N test claims (stratified)")
-    ap.add_argument("--llm-pos-share", type=float, default=0.33,
-                    help="share of the judge sample that is unsupported claims; the subset base rate differs from the full test")
+    ap.add_argument("--judge-preds", help="judge_preds.json from ml.verifier.judge: also compare every system with the LLM judge on those claims")
     ap.add_argument("--save-scores", help="write every system's dev/test P(supported) to this JSON (for offline reuse)")
     ap.add_argument("--load-scores", help="reuse scores saved by --save-scores instead of running neural models "
                                           "(lets the LLM judge be compared locally without the model or a GPU)")
@@ -149,24 +132,25 @@ def main() -> None:
             Path(args.save_scores).write_text(json.dumps(saved), encoding="utf-8")
 
     sample_rows: list[dict] = []
-    if args.llm_sample:
-        rng = random.Random(args.seed)
-        pos_idx = [i for i, y in enumerate(unsup) if y == 1]
-        neg_idx = [i for i, y in enumerate(unsup) if y == 0]
-        rng.shuffle(pos_idx)
-        rng.shuffle(neg_idx)
-        n_pos = round(args.llm_sample * args.llm_pos_share)      # enough hallucinated claims for a usable recall/precision
-        idx = sorted(pos_idx[:n_pos] + neg_idx[: args.llm_sample - n_pos])
-        sub, sub_unsup = [test[i] for i in idx], [unsup[i] for i in idx]
-        preds, ms = llm_judge(sub)
-        m = prf(sub_unsup, preds)
-        judge = {"system": "llm-judge (DeepSeek)", "precision": m["precision"], "recall": m["recall"], "f1": m["f1"],
-                 "auc": float("nan"), "ece": float("nan"), "latency_ms": round(ms, 1), "claims": len(sub)}
-        for key in ("precision", "recall", "f1"):
-            judge[f"{key}_lo"], judge[f"{key}_hi"] = _ci(sub_unsup, preds, key)
-        sample_rows.append(judge)
-        for name, (probs, lat) in scored.items():
-            sample_rows.append(score_row(f"{name} [same subset]", sub_unsup, [probs[i] for i in idx], thresholds[name], lat))
+    judge_note = ""
+    if args.judge_preds and Path(args.judge_preds).exists():
+        jp = json.loads(Path(args.judge_preds).read_text(encoding="utf-8"))
+        idx = jp["idx"]
+        if [claim_hash(test[i]) for i in idx] != jp["hashes"]:
+            print("WARNING: judge_preds.json does not match this test split (claim hashes differ); skipping the judge", flush=True)
+        else:
+            sub_unsup = [unsup[i] for i in idx]
+            m = prf(sub_unsup, jp["preds"])
+            judge = {"system": f"llm-judge ({jp['model']})", "precision": m["precision"], "recall": m["recall"], "f1": m["f1"],
+                     "auc": float("nan"), "ece": float("nan"), "latency_ms": round(jp["ms"], 1), "claims": len(idx)}
+            for key in ("precision", "recall", "f1"):
+                judge[f"{key}_lo"], judge[f"{key}_hi"] = _ci(sub_unsup, jp["preds"], key)
+            sample_rows.append(judge)
+            for name, (probs, lat) in scored.items():
+                sample_rows.append(score_row(f"{name} [same claims]", sub_unsup, [probs[i] for i in idx], thresholds[name], lat))
+            judge_note = (f"LLM-judge comparison on {len(idx)} stratified test claims ({jp['pos_share']:.0%} unsupported, so precision is "
+                          "not comparable to the full-test table). All systems see the same claims; the judge prompt is a frozen constant, "
+                          "temperature 0, one call per claim, no examples.")
 
     base_rate = sum(unsup) / len(unsup)
     cols = ["precision", "recall", "f1", "auc", "ece", "latency_ms", "claims"]
@@ -188,9 +172,7 @@ def main() -> None:
 
     md = table(f"Held-out RAGTruth test claims (unsupported = positive class; base rate {base_rate:.1%})", rows)
     if sample_rows:
-        md += table(f"LLM-judge comparison on a stratified subset of {args.llm_sample} test claims "
-                    f"(unsupported share {args.llm_pos_share:.0%}, so precision is not comparable to the full-test table; "
-                    "all systems below see the same claims, the judge prompt is a frozen constant, temperature 0)", sample_rows)
+        md += table(judge_note, sample_rows)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "verifier_results.md").write_text("\n".join(md), encoding="utf-8")
     (OUT / "verifier_results.json").write_text(json.dumps({"test": rows, "subset": sample_rows}, indent=2), encoding="utf-8")
