@@ -24,10 +24,16 @@ Frontend: http://localhost:3000 · Backend: http://localhost:4000 (`/health`, `/
 ## Tests
 
 ```bash
-cd backend && npm test                  # unit tests; set TEST_DATABASE_URL and TEST_REDIS_URL for integration tests
-cd frontend && npm test
-cd ai && pip install -r requirements.txt -r requirements-dev.txt && pytest
+(cd backend && npm ci && npm test)
+(cd frontend && npm ci && npm test)
+(cd ai && python -m pip install -r requirements-dev.txt && python -m pytest -q)
 ```
+
+Run these commands from the repository root with Node.js 22 and Python 3.11 (the versions used in CI).
+Each subshell returns to the root before the next command. For backend and AI integration tests,
+set `TEST_DATABASE_URL` to a throwaway Postgres database with pgvector and apply
+`supabase/migrations/*.sql` in filename order; set `TEST_REDIS_URL` for backend Redis integration tests.
+Never point integration tests at a production database.
 
 ## Account and workspace model
 
