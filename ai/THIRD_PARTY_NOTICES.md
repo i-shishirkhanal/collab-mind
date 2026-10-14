@@ -1,5 +1,18 @@
 # Third-Party Notices — AI Service
 
+## Podcastfy
+
+- Source: https://github.com/souzatharsis/podcastfy
+- Version: `podcastfy==0.4.3` (`requirements-podcast.txt`, isolated interpreter).
+- License: Apache-2.0. The installed distribution retains upstream license/notice files.
+- Attribution: Podcastfy, Copyright 2024 Tharsis T. P. Souza and contributors.
+- Used by: `scripts/podcast_tts_worker.py` calls the published `TextToSpeech` API to render
+  CollabMind's generated two-person transcript. No upstream Python source is copied or modified.
+- Not used: upstream content extraction, independent topic search, LLM transcript generation,
+  or the upstream web/API application. See `docs/podcastfy-investigation.md` for the evidence boundary.
+
+---
+
 Document extraction in the `ai/` service uses open-source libraries, consumed
 as pinned pip dependencies (`requirements.txt`). **No upstream source code is
 copied, vendored or modified in this repository.**

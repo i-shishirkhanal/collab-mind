@@ -5,9 +5,10 @@ import { FlashcardsTool } from "@/components/studio/FlashcardsTool";
 import { QuizTool } from "@/components/studio/QuizTool";
 import { StudyGuideTool } from "@/components/studio/StudyGuideTool";
 import { ReportTool } from "@/components/studio/ReportTool";
+import { PodcastTool } from "@/components/studio/PodcastTool";
 import { AgentTool } from "@/components/studio/AgentTool";
 import { AgentRunPanel, type AgentDef } from "@/components/studio/AgentRunPanel";
-import { CopySlash, HelpCircle, BookOpen, FileSignature, Zap, Search, Library, Scale, FileText } from "lucide-react";
+import { CopySlash, HelpCircle, BookOpen, FileSignature, Zap, Search, Library, Scale, FileText, Headphones } from "lucide-react";
 
 const SPECIALISTS: AgentDef[] = [
   { key: "research", title: "Research Agent", subtitle: "Investigates a question across your sources", icon: Search,
@@ -32,6 +33,7 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
     { id: "quiz", label: "Practice Quiz", icon: HelpCircle, desc: "Test your understanding" },
     { id: "guide", label: "Study Guide", icon: BookOpen, desc: "Generate a markdown guide" },
     { id: "report", label: "AI Report Draft", icon: FileSignature, desc: "Exportable markdown report" },
+    { id: "podcast", label: "Podcast Studio", icon: Headphones, desc: "Two-voice audio from your sources" },
     { id: "agent", label: "Study Coach Agent", icon: Zap, desc: "Autonomous learning planner" },
     ...SPECIALISTS.map((a) => ({ id: a.key, label: a.title, icon: a.icon, desc: a.subtitle })),
   ];
@@ -42,6 +44,7 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
       case "quiz": return <QuizTool workspaceId={id} />;
       case "guide": return <StudyGuideTool workspaceId={id} />;
       case "report": return <ReportTool workspaceId={id} />;
+      case "podcast": return <PodcastTool key={id} workspaceId={id} />;
       case "agent": return <AgentTool workspaceId={id} />;
       default: {
         const specialist = SPECIALISTS.find((a) => a.key === activeTool);

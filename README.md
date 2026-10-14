@@ -3,6 +3,14 @@
 Collaborative study workspaces: upload documents, ask grounded questions with citations, generate
 flashcards/quizzes/guides/reports, run a study-coach agent, and message or call teammates.
 
+Sources also support shared passage highlights, threaded comments, teammate mentions, resolved
+discussions, and side-by-side AI comparisons with citations. See `docs/source-collaboration.md` for
+setup, coverage limits, and usage.
+
+Studio includes **Podcast Studio**, powered by Podcastfy: turn selected sources into two-voice
+audio with transcripts, source references, playback, and MP3 downloads. Apply the podcast migration
+and rebuild the AI image; see `docs/podcast-studio.md` for native setup and storage requirements.
+
 | Service | Path | Stack |
 |---|---|---|
 | Frontend | `frontend/` | Next.js 16, NextAuth (email + password), Zustand |

@@ -9,6 +9,7 @@ import { FileText, Database, Trash2, Globe, Sparkles, Loader2, X, Copy, Check } 
 import { getSources, summarizeSource, retrySource, deleteSource, setSourceActive } from "@/lib/api";
 import { STAGE_LABELS } from "@/lib/sourceFiles";
 import { RotateCw } from "lucide-react";
+import { SourceCollaboration } from "@/components/sources/SourceCollaboration";
 
 export default function SourcesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -23,6 +24,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
   } | null>(null);
   const [loadingSummaryId, setLoadingSummaryId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [readerSource, setReaderSource] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -156,7 +158,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
 
   return (
     <div className="h-full overflow-y-auto bg-slate-950 custom-scrollbar p-8 relative">
-      <div className="max-w-5xl mx-auto space-y-10">
+      <div className="max-w-7xl mx-auto space-y-10">
         
         <div>
           <h1 className="text-2xl font-serif font-semibold text-slate-50 tracking-tight">Sources</h1>
@@ -218,6 +220,8 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {source.status === 'ready' && <a href="#source-collaboration" onClick={() => setReaderSource(source.id)}
+                              className="text-xs text-indigo-300 hover:text-indigo-100 whitespace-nowrap">Read & discuss</a>}
                             <button
                               type="button"
                               role="switch"
@@ -277,6 +281,7 @@ export default function SourcesPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
 
+        <SourceCollaboration key={`${id}-${readerSource}`} workspaceId={id} sources={sources} initialSource={readerSource} />
       </div>
 
       {/* Source Summary Modal */}

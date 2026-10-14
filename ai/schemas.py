@@ -121,6 +121,41 @@ class ChatResponse(BaseModel):
     faithfulness: Optional[Faithfulness] = None
 
 
+class SourceComparisonRequest(BaseModel):
+    workspace_id: Id
+    user_id: Optional[Id] = None
+    source_ids: Annotated[list[Id], Field(min_length=2, max_length=2)]
+    focus: Annotated[str, Field(max_length=500)] = ""
+
+
+class ComparisonFinding(BaseModel):
+    category: Literal["agreement", "contradiction", "gap"]
+    topic: Annotated[str, Field(min_length=1, max_length=300)]
+    left: Annotated[str, Field(max_length=2000)]
+    right: Annotated[str, Field(max_length=2000)]
+    left_citations: Annotated[list[int], Field(max_length=10)] = []
+    right_citations: Annotated[list[int], Field(max_length=10)] = []
+
+
+class ComparisonDraft(BaseModel):
+    findings: Annotated[list[ComparisonFinding], Field(max_length=18)]
+
+
+class ComparisonCoverage(BaseModel):
+    source_id: str
+    source_name: str
+    reviewed_passages: int
+    total_passages: int
+    sampled: bool
+
+
+class SourceComparisonResponse(BaseModel):
+    findings: list[ComparisonFinding]
+    citations: list[Citation]
+    coverage: list[ComparisonCoverage]
+    warnings: list[str]
+
+
 # ── Agent endpoints (Study Coach) ─────────────────────────────────────────────
 
 class StudyCoachRequest(BaseModel):

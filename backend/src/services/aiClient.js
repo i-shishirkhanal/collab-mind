@@ -31,4 +31,9 @@ const postStream = (path, data, { timeout = 150_000 } = {}) =>
     headers: { Authorization: `Bearer ${aiServiceToken()}` },
   });
 
-module.exports = { post, get, postStream, baseURL };
+const getStream = (path, { timeout = 120000 } = {}) => axios.request({
+  method: 'get', url: `${baseURL()}${path}`, timeout, responseType: 'stream',
+  headers: { Authorization: `Bearer ${aiServiceToken()}` },
+});
+
+module.exports = { post, get, postStream, getStream, baseURL };

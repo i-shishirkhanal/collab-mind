@@ -45,6 +45,9 @@ from agents.reaper import reaper_loop
 from agents.runner import run_study_coach_background
 from agents.engine import RunContext, run_agent
 from agents.registry import AGENTS
+from schemas import SourceComparisonRequest, SourceComparisonResponse
+from rag.comparison import compare_sources
+from podcasts import router as podcast_router, reaper_loop as podcast_reaper_loop
 
 log = logging.getLogger("collabmind.ai")
 
@@ -64,11 +67,13 @@ async def lifespan(app: FastAPI):
 
     app.state.study_coach = StudyCoachAgent(pool)
     reaper = asyncio.create_task(reaper_loop(pool))
+    podcast_reaper = asyncio.create_task(podcast_reaper_loop(pool))
 
     yield
 
     reaper.cancel()
-    await asyncio.gather(reaper, return_exceptions=True)
+    podcast_reaper.cancel()
+    await asyncio.gather(reaper, podcast_reaper, return_exceptions=True)
     await close_pool()
     await close_redis()
 
@@ -90,6 +95,7 @@ app = FastAPI(
 
 
 # ── Error mapping: typed failures -> honest status codes, safe messages ───────
+app.include_router(podcast_router)
 
 def _error_response(status: int, code: str, message: str, retry_after: float | None = None) -> JSONResponse:
     headers = {"Retry-After": str(int(retry_after))} if retry_after else None
@@ -124,6 +130,11 @@ async def embed_endpoint(body: EmbedRequest) -> EmbedResponse:
         storage_url=body.storage_url,
     )
     return EmbedResponse(source_id=body.source_id, chunks_stored=chunks_stored)
+
+
+@app.post("/sources/compare", response_model=SourceComparisonResponse)
+async def compare_sources_endpoint(body: SourceComparisonRequest) -> SourceComparisonResponse:
+    return await compare_sources(await get_pool(), body)
 
 
 @app.post("/sources/summarize", response_model=SummarizeResponse, summary="Summarize a specific source document")

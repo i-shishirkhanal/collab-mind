@@ -67,6 +67,8 @@ app.use('/api/auth',       authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/workspaces', memberRoutes);   // /api/workspaces/:workspaceId/members
 app.use('/api/workspaces', sourceRoutes);   // /api/workspaces/:workspaceId/sources
+app.use('/api/workspaces', require('./src/routes/sourceCollaboration'));
+app.use('/api/workspaces', require('./src/routes/podcasts'));
 app.use('/api/workspaces', chatRoutes);     // /api/workspaces/:workspaceId/chat
 app.use('/api/workspaces', require('./src/routes/agents')); // /api/workspaces/:workspaceId/agents and /studio
 app.use('/api/invites',       require('./src/routes/invites'));       // my pending workspace invitations

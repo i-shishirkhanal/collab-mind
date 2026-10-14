@@ -30,6 +30,8 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required}
       - UPLOADS_DIR=/app/uploads
+      - PODCAST_TTS_PROVIDER=${PODCAST_TTS_PROVIDER:-edge}
+      - PODCAST_OPENAI_API_KEY=${PODCAST_OPENAI_API_KEY:-}
       # Chat/study/research models (server-side only). See ai/.env.example for all knobs.
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com}
